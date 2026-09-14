@@ -3,16 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>登录中心 · Demo</title>
+<title>登录中心 · Demo（基于 6 个提示词模板）</title>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
          background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%); min-height: 100vh;
          display: flex; align-items: center; justify-content: center; color: #222; }
-  .card { width: 380px; background: #fff; border-radius: 16px; padding: 28px 26px;
+  .card { width: 400px; background: #fff; border-radius: 16px; padding: 28px 26px;
           box-shadow: 0 20px 50px rgba(0,0,0,.25); }
   h1 { font-size: 20px; margin: 0 0 4px; text-align: center; }
-  .sub { text-align: center; color: #888; font-size: 13px; margin-bottom: 18px; }
+  .sub { text-align: center; color: #888; font-size: 13px; margin-bottom: 16px; }
+  .tag { display:inline-block; background:#eef2ff; color:#4355e6; border-radius:6px;
+         font-size:11px; padding:2px 7px; margin-bottom:6px; }
   label { font-size: 13px; color: #555; display: block; margin: 12px 0 5px; }
   input { width: 100%; padding: 11px 12px; border: 1px solid #ddd; border-radius: 9px;
           font-size: 14px; outline: none; }
@@ -40,10 +42,12 @@
 </head>
 <body>
 <div class="card" id="card">
-  <!-- 登录表单：模板1 基础账号密码 + 模板4 密码管理器 + 模板6 错误处理 -->
+
+  <!-- 模板1 基础账号密码 + 模板4 密码管理器 + 模板6 错误处理 -->
   <div id="loginView">
+    <span class="tag">模板1 · 基础账号密码登录</span>
     <h1>账号登录</h1>
-    <div class="sub">演示用 · 数据不会被发送到任何服务器</div>
+    <div class="sub">演示用 · 数据不发送到任何服务器</div>
     <div class="error" id="err"></div>
 
     <label for="u">用户名 / 邮箱</label>
@@ -55,13 +59,13 @@
     <div class="row">
       <input id="rm" type="checkbox"><label for="rm" style="margin:0">记住我</label>
     </div>
-    <div class="hint">💡 推荐用密码管理器（如 1Password / Bitwarden）自动填充，避免明文输入。</div>
+    <div class="hint">💡 <b>模板4：</b>推荐用密码管理器（1Password / Bitwarden）自动填充，避免明文输入。</div>
 
     <button class="primary" onclick="doLogin()">登录</button>
 
     <!-- 模板3 第三方 OAuth -->
     <div class="oauth">
-      <div class="oauth-title">或使用第三方账号登录</div>
+      <div class="oauth-title">— 模板3 · 第三方 OAuth 登录 —</div>
       <div class="oauth-btns">
         <button onclick="oauth('微信')">微信</button>
         <button onclick="oauth('Google')">Google</button>
@@ -72,8 +76,9 @@
 
   <!-- 模板2 两步验证 -->
   <div id="step2" class="step2">
+    <span class="tag">模板2 · 两步验证（2FA）</span>
     <h1>二次验证</h1>
-    <div class="sub">已向你的手机/认证器发送 6 位验证码</div>
+    <div class="sub">已向手机 / 认证器发送 6 位验证码</div>
     <div class="error" id="err2"></div>
     <label for="code">验证码</label>
     <input id="code" type="text" inputmode="numeric" maxlength="6" placeholder="请输入 6 位验证码">
@@ -83,8 +88,9 @@
   <!-- 模板5 登录后执行任务 -->
   <div id="dash" class="dash">
     <span class="badge">已登录</span>
+    <span class="tag">模板5 · 登录后执行任务</span>
     <h1>欢迎回来 👋</h1>
-    <p style="font-size:13px;color:#666">登录成功后，可继续以下任务：</p>
+    <p style="font-size:13px;color:#666">登录成功，可继续以下任务：</p>
     <ul>
       <li>导出本月账单 CSV</li>
       <li>修改账户昵称</li>
@@ -95,40 +101,37 @@
 </div>
 
 <script>
-function show(id){ document.getElementById(id).style.display = 'block'; }
-function hide(id){ document.getElementById(id).style.display = 'none'; }
+function show(id){ document.getElementById(id).style.display='block'; }
+function hide(id){ document.getElementById(id).style.display='none'; }
 function err(msg){ var e=document.getElementById('err'); e.textContent=msg; e.style.display=msg?'block':'none'; }
 
-// 模板1 + 模板6：基础登录与异常
+/* 模板1 + 模板6：基础登录与异常处理 */
 function doLogin(){
   err('');
   var u=document.getElementById('u').value.trim();
   var p=document.getElementById('p').value;
-  if(!u || !p){ err('账号或密码不能为空'); return; }
-  if(p.length < 6){ err('密码错误（演示：长度需 ≥ 6）'); return; }
-  // 模拟触发 2FA
-  hide('loginView'); show('step2');
+  if(!u || !p){ err('账号或密码不能为空'); return; }      // 模板6
+  if(p.length < 6){ err('密码错误（演示：长度需 ≥ 6）'); return; } // 模板6
+  hide('loginView'); show('step2');                        // 触发模板2
 }
 
-// 模板2：两步验证
+/* 模板2：两步验证 */
 function verify(){
   var e=document.getElementById('err2'); var c=document.getElementById('code').value.trim();
   if(!/^\d{6}$/.test(c)){ e.textContent='验证码格式不正确（需 6 位数字）'; e.style.display='block'; return; }
   hide('step2'); show('dash');
 }
 
-// 模板3：OAuth
+/* 模板3：OAuth */
 function oauth(name){
   err('');
-  alert('即将跳转到 ' + name + ' 授权页（演示）。\n实际场景：确认账号 → 点击「授权」→ 跳回本站。');
+  alert('即将跳转到 ' + name + ' 授权页（演示）。\n实际：确认账号 → 点「授权」→ 跳回本站。');
   hide('loginView'); show('dash');
 }
 
-// 模板5 收尾：退出
-function logout(){
-  hide('dash'); show('loginView');
-  document.getElementById('u').value=''; document.getElementById('p').value='';
-}
+/* 模板5 收尾：退出 */
+function logout(){ hide('dash'); show('loginView');
+  document.getElementById('u').value=''; document.getElementById('p').value=''; }
 </script>
 </body>
 </html>
