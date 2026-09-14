@@ -3,69 +3,102 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>登录中心 · Demo（基于 6 个提示词模板）</title>
+<title>VALORANT 风格登录</title>
 <style>
-  * { box-sizing: border-box; }
-  body { margin: 0; font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
-         background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%); min-height: 100vh;
-         display: flex; align-items: center; justify-content: center; color: #222; }
-  .card { width: 400px; background: #fff; border-radius: 16px; padding: 28px 26px;
-          box-shadow: 0 20px 50px rgba(0,0,0,.25); }
-  h1 { font-size: 20px; margin: 0 0 4px; text-align: center; }
-  .sub { text-align: center; color: #888; font-size: 13px; margin-bottom: 16px; }
-  .tag { display:inline-block; background:#eef2ff; color:#4355e6; border-radius:6px;
-         font-size:11px; padding:2px 7px; margin-bottom:6px; }
-  label { font-size: 13px; color: #555; display: block; margin: 12px 0 5px; }
-  input { width: 100%; padding: 11px 12px; border: 1px solid #ddd; border-radius: 9px;
-          font-size: 14px; outline: none; }
-  input:focus { border-color: #2575fc; }
-  .row { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; }
-  .row input { width: auto; }
-  button.primary { width: 100%; margin-top: 18px; padding: 12px; border: none; border-radius: 9px;
-          background: #2575fc; color: #fff; font-size: 15px; cursor: pointer; }
-  button.primary:hover { background: #1a63da; }
-  .oauth { margin-top: 18px; }
-  .oauth-title { text-align: center; font-size: 12px; color: #aaa; margin: 8px 0; }
-  .oauth-btns { display: flex; gap: 10px; }
-  .oauth-btns button { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 9px;
-          background: #fff; cursor: pointer; font-size: 13px; }
-  .oauth-btns button:hover { border-color: #2575fc; }
-  .hint { font-size: 12px; color: #888; margin-top: 10px; line-height: 1.5; }
-  .error { background: #fde8e8; color: #c0392b; border: 1px solid #f5c6c6;
-          padding: 9px 11px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; display: none; }
-  .step2 { display: none; }
-  .dash { display: none; }
-  .dash ul { padding-left: 18px; font-size: 14px; line-height: 1.9; }
-  .badge { display:inline-block; background:#e8f3ff; color:#2575fc; border-radius:6px;
-          padding:2px 8px; font-size:12px; margin-bottom:10px; }
+  * { box-sizing: border-box; margin: 0; }
+  :root { --red:#ff4655; --dark:#0f1923; --panel:#1b2733; }
+  body { font-family: "Arial Narrow", "Oswald", "Microsoft YaHei", sans-serif;
+         height: 100vh; overflow: hidden; background: var(--dark); color: #ece8e1;
+         display: flex; align-items: center; justify-content: center; }
+
+  /* ===== 动态背景：流动红光 + 移动网格 + 漂浮粒子 ===== */
+  .bg { position: fixed; inset: 0; z-index: 0; overflow: hidden;
+        background:
+          radial-gradient(circle at 20% 30%, rgba(255,70,85,.25), transparent 45%),
+          radial-gradient(circle at 80% 70%, rgba(255,70,85,.18), transparent 45%),
+          var(--dark); }
+  .bg::before { content:""; position:absolute; inset:-50%;
+        background-image: linear-gradient(rgba(255,70,85,.12) 1px, transparent 1px),
+                          linear-gradient(90deg, rgba(255,70,85,.12) 1px, transparent 1px);
+        background-size: 46px 46px;
+        transform: perspective(400px) rotateX(60deg);
+        animation: grid 8s linear infinite; opacity:.5; }
+  @keyframes grid { from{ background-position:0 0; } to{ background-position:0 46px; } }
+  .glow { position:absolute; width:420px; height:420px; border-radius:50%;
+        background: radial-gradient(circle, rgba(255,70,85,.35), transparent 70%);
+        filter: blur(20px); animation: float 9s ease-in-out infinite; }
+  .glow.a { top:-120px; left:-80px; } .glow.b { bottom:-140px; right:-100px; animation-delay:-4s; }
+  @keyframes float { 0%,100%{ transform: translate(0,0) scale(1);} 50%{ transform: translate(40px,30px) scale(1.15);} }
+  .p { position:absolute; width:3px; height:3px; background:#ff4655; border-radius:50%;
+       box-shadow:0 0 8px #ff4655; animation: rise linear infinite; opacity:.7; }
+  @keyframes rise { from{ transform: translateY(100vh);} to{ transform: translateY(-10vh);} }
+
+  /* ===== 登录卡片：VALORANT 切角风格 ===== */
+  .card { position: relative; z-index: 1; width: 400px; background: var(--panel);
+          padding: 34px 30px 30px; clip-path: polygon(0 0, 100% 0, 100% 92%, 92% 100%, 0 100%);
+          box-shadow: 0 0 0 1px rgba(255,70,85,.4), 0 24px 60px rgba(0,0,0,.6); }
+  .card::before { content:""; position:absolute; left:0; top:0; width:5px; height:54px; background:var(--red); }
+  h1 { font-size: 30px; letter-spacing: 3px; text-transform: uppercase; font-weight: 800;
+       transform: scaleY(1.15); margin: 6px 0 2px; }
+  .sub { color:#8b97a3; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 18px; }
+  .tag { display:inline-block; background: rgba(255,70,85,.15); color: var(--red);
+         font-size: 11px; letter-spacing: 1px; padding: 3px 8px; margin-bottom: 8px; text-transform: uppercase; }
+  label { font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color:#a7b0ba;
+          display:block; margin: 14px 0 6px; }
+  input { width: 100%; padding: 12px 13px; border: 1px solid #2c3a47; border-left: 3px solid #2c3a47;
+          background:#0f1923; color:#ece8e1; font-size: 14px; outline:none; border-radius:0; }
+  input:focus { border-color: var(--red); border-left-color: var(--red); }
+  .row { display:flex; align-items:center; gap:8px; margin-top:14px; font-size:12px; letter-spacing:1px; text-transform:uppercase; }
+  .row input { width:auto; }
+  button.primary { width:100%; margin-top:20px; padding:14px; border:none; cursor:pointer;
+          background:var(--red); color:#fff; font-size:15px; font-weight:800; letter-spacing:3px; text-transform:uppercase;
+          clip-path: polygon(0 0,100% 0,100% 80%,94% 100%,0 100%); transition:.15s; }
+  button.primary:hover { background:#ff5e6c; }
+  .oauth { margin-top:20px; }
+  .oauth-title { text-align:center; font-size:11px; letter-spacing:2px; color:#6b7682; text-transform:uppercase; margin:10px 0; }
+  .oauth-btns { display:flex; gap:10px; }
+  .oauth-btns button { flex:1; padding:11px; background:#0f1923; border:1px solid #2c3a47; color:#ece8e1;
+          cursor:pointer; font-size:12px; letter-spacing:1px; text-transform:uppercase; }
+  .oauth-btns button:hover { border-color:var(--red); color:var(--red); }
+  .hint { font-size:11px; color:#8b97a3; margin-top:12px; line-height:1.6; letter-spacing:.5px; }
+  .error { background:rgba(255,70,85,.12); color:var(--red); border:1px solid rgba(255,70,85,.5);
+          padding:10px 12px; font-size:12px; letter-spacing:.5px; margin-bottom:14px; display:none; }
+  .step2,.dash { display:none; }
+  .dash ul { padding-left:18px; font-size:14px; line-height:2; }
+  .badge { display:inline-block; background:var(--red); color:#fff; padding:3px 9px; font-size:11px; letter-spacing:1px; text-transform:uppercase; }
 </style>
 </head>
 <body>
-<div class="card" id="card">
+<div class="bg">
+  <div class="glow a"></div><div class="glow b"></div>
+  <div class="p" style="left:15%;animation-duration:11s"></div>
+  <div class="p" style="left:35%;animation-duration:14s;animation-delay:-3s"></div>
+  <div class="p" style="left:55%;animation-duration:9s;animation-delay:-6s"></div>
+  <div class="p" style="left:75%;animation-duration:13s;animation-delay:-2s"></div>
+  <div class="p" style="left:88%;animation-duration:10s;animation-delay:-5s"></div>
+</div>
 
-  <!-- 模板1 基础账号密码 + 模板4 密码管理器 + 模板6 错误处理 -->
+<div class="card">
+  <!-- 模板1 + 模板4 + 模板6 -->
   <div id="loginView">
     <span class="tag">模板1 · 基础账号密码登录</span>
-    <h1>账号登录</h1>
-    <div class="sub">演示用 · 数据不发送到任何服务器</div>
+    <h1>登录</h1>
+    <div class="sub">SIGN IN TO ENTER THE PROTOCOL</div>
     <div class="error" id="err"></div>
 
-    <label for="u">用户名 / 邮箱</label>
-    <input id="u" type="text" autocomplete="username" placeholder="请输入账号">
+    <label for="u">账号 / 邮箱</label>
+    <input id="u" type="text" autocomplete="username" placeholder="AGENT ID">
 
     <label for="p">密码</label>
-    <input id="p" type="password" autocomplete="current-password" placeholder="请输入密码">
+    <input id="p" type="password" autocomplete="current-password" placeholder="PASSWORD">
 
-    <div class="row">
-      <input id="rm" type="checkbox"><label for="rm" style="margin:0">记住我</label>
-    </div>
-    <div class="hint">💡 <b>模板4：</b>推荐用密码管理器（1Password / Bitwarden）自动填充，避免明文输入。</div>
+    <div class="row"><input id="rm" type="checkbox"><label for="rm" style="margin:0">记住我</label></div>
+    <div class="hint">⚡ 模板4：建议使用密码管理器自动填充，避免明文输入凭证。</div>
 
-    <button class="primary" onclick="doLogin()">登录</button>
+    <button class="primary" onclick="doLogin()">进入</button>
 
-    <!-- 模板3 第三方 OAuth -->
     <div class="oauth">
-      <div class="oauth-title">— 模板3 · 第三方 OAuth 登录 —</div>
+      <div class="oauth-title">— 模板3 · 第三方账号登录 —</div>
       <div class="oauth-btns">
         <button onclick="oauth('微信')">微信</button>
         <button onclick="oauth('Google')">Google</button>
@@ -74,64 +107,55 @@
     </div>
   </div>
 
-  <!-- 模板2 两步验证 -->
+  <!-- 模板2 -->
   <div id="step2" class="step2">
-    <span class="tag">模板2 · 两步验证（2FA）</span>
-    <h1>二次验证</h1>
-    <div class="sub">已向手机 / 认证器发送 6 位验证码</div>
+    <span class="tag">模板2 · 两步验证 2FA</span>
+    <h1>验证</h1>
+    <div class="sub">ENTER SECURITY CODE</div>
     <div class="error" id="err2"></div>
     <label for="code">验证码</label>
-    <input id="code" type="text" inputmode="numeric" maxlength="6" placeholder="请输入 6 位验证码">
-    <button class="primary" onclick="verify()">确认验证</button>
+    <input id="code" type="text" inputmode="numeric" maxlength="6" placeholder="6 位数字">
+    <button class="primary" onclick="verify()">确认</button>
   </div>
 
-  <!-- 模板5 登录后执行任务 -->
+  <!-- 模板5 -->
   <div id="dash" class="dash">
     <span class="badge">已登录</span>
     <span class="tag">模板5 · 登录后执行任务</span>
-    <h1>欢迎回来 👋</h1>
-    <p style="font-size:13px;color:#666">登录成功，可继续以下任务：</p>
+    <h1>欢迎回来</h1>
+    <p style="font-size:13px;color:#8b97a3;letter-spacing:1px">登录成功，可继续以下任务：</p>
     <ul>
-      <li>导出本月账单 CSV</li>
-      <li>修改账户昵称</li>
+      <li>导出本月战绩 CSV</li>
+      <li>修改特工昵称</li>
       <li>查看登录历史</li>
     </ul>
-    <button class="primary" onclick="logout()" style="background:#888">退出登录</button>
+    <button class="primary" onclick="logout()" style="background:#2c3a47">退出</button>
   </div>
 </div>
 
 <script>
-function show(id){ document.getElementById(id).style.display='block'; }
-function hide(id){ document.getElementById(id).style.display='none'; }
-function err(msg){ var e=document.getElementById('err'); e.textContent=msg; e.style.display=msg?'block':'none'; }
+function show(id){document.getElementById(id).style.display='block';}
+function hide(id){document.getElementById(id).style.display='none';}
+function err(m){var e=document.getElementById('err');e.textContent=m;e.style.display=m?'block':'none';}
 
-/* 模板1 + 模板6：基础登录与异常处理 */
+/* 模板1 + 模板6 */
 function doLogin(){
   err('');
-  var u=document.getElementById('u').value.trim();
-  var p=document.getElementById('p').value;
-  if(!u || !p){ err('账号或密码不能为空'); return; }      // 模板6
-  if(p.length < 6){ err('密码错误（演示：长度需 ≥ 6）'); return; } // 模板6
-  hide('loginView'); show('step2');                        // 触发模板2
+  var u=document.getElementById('u').value.trim(), p=document.getElementById('p').value;
+  if(!u||!p){err('账号与密码不能为空');return;}
+  if(p.length<6){err('密码错误（演示：长度需 ≥ 6）');return;}
+  hide('loginView');show('step2');
 }
-
-/* 模板2：两步验证 */
+/* 模板2 */
 function verify(){
-  var e=document.getElementById('err2'); var c=document.getElementById('code').value.trim();
-  if(!/^\d{6}$/.test(c)){ e.textContent='验证码格式不正确（需 6 位数字）'; e.style.display='block'; return; }
-  hide('step2'); show('dash');
+  var e=document.getElementById('err2'),c=document.getElementById('code').value.trim();
+  if(!/^\d{6}$/.test(c)){e.textContent='验证码格式不正确（需 6 位数字）';e.style.display='block';return;}
+  hide('step2');show('dash');
 }
-
-/* 模板3：OAuth */
-function oauth(name){
-  err('');
-  alert('即将跳转到 ' + name + ' 授权页（演示）。\n实际：确认账号 → 点「授权」→ 跳回本站。');
-  hide('loginView'); show('dash');
-}
-
-/* 模板5 收尾：退出 */
-function logout(){ hide('dash'); show('loginView');
-  document.getElementById('u').value=''; document.getElementById('p').value=''; }
+/* 模板3 */
+function oauth(n){err('');alert('即将跳转 '+n+' 授权页（演示）。\n实际：确认账号 → 授权 → 跳回。');hide('loginView');show('dash');}
+/* 模板5 收尾 */
+function logout(){hide('dash');show('loginView');document.getElementById('u').value='';document.getElementById('p').value='';}
 </script>
 </body>
 </html>
