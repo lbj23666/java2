@@ -3,17 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VALORANT 风格登录</title>
+<title>VALORANT 风格 · 登录 / 注册</title>
 <style>
   * { box-sizing: border-box; margin: 0; }
   :root { --red:#ff4655; --dark:#0f1923; --panel:#1b2733; }
+
+  /* 页面基础：窄体无衬线字体，贴合 VALORANT 视觉语言 */
   body { font-family: "Arial Narrow", "Oswald", "Microsoft YaHei", sans-serif;
-         height: 100vh; overflow: hidden; background: var(--dark); color: #ece8e1;
-         display: flex; align-items: center; justify-content: center; }
+         min-height: 100vh; background: var(--dark); color: #ece8e1;
+         display: flex; align-items: center; justify-content: center; padding: 40px 16px; }
 
   /* ===== 动态背景：英雄图缓慢缩放+平移 + 红色暗化叠层 ===== */
+  /* 说明：valorant-hero.png 缺失时自动降级为深色渐变，页面依然完整可看 */
   .bg { position: fixed; inset: 0; z-index: 0; overflow: hidden;
-        background: url('valorant-hero.png') center center / cover no-repeat;
+        background:
+          url('valorant-hero.png') center center / cover no-repeat,
+          radial-gradient(circle at 20% 15%, #22303d 0%, #0f1923 60%),
+          var(--dark);
         animation: kenburns 22s ease-in-out infinite alternate; transform-origin: center; }
   @keyframes kenburns { from{ transform: scale(1) translate(0,0);} to{ transform: scale(1.14) translate(-2%, -2%);} }
   .bg::after { content:""; position:absolute; inset:0;
@@ -22,8 +28,8 @@
           linear-gradient(90deg, rgba(15,25,35,.85) 0%, rgba(15,25,35,.45) 55%, rgba(15,25,35,.85) 100%),
           rgba(15,25,35,.45); }
 
-  /* ===== 登录卡片：VALORANT 切角风格 ===== */
-  .card { position: relative; z-index: 1; width: 400px; background: var(--panel);
+  /* ===== 主卡片：VALORANT 切角风格 ===== */
+  .card { position: relative; z-index: 1; width: 420px; max-width: 100%; background: var(--panel);
           padding: 34px 30px 30px; clip-path: polygon(0 0, 100% 0, 100% 92%, 92% 100%, 0 100%);
           box-shadow: 0 0 0 1px rgba(255,70,85,.4), 0 24px 60px rgba(0,0,0,.6); }
   .card::before { content:""; position:absolute; left:0; top:0; width:5px; height:54px; background:var(--red); }
@@ -35,24 +41,62 @@
   label { font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color:#a7b0ba;
           display:block; margin: 14px 0 6px; }
   input { width: 100%; padding: 12px 13px; border: 1px solid #2c3a47; border-left: 3px solid #2c3a47;
-          background:#0f1923; color:#ece8e1; font-size: 14px; outline:none; border-radius:0; }
+          background:#0f1923; color:#ece8e1; font-size: 14px; outline:none; border-radius:0;
+          transition: border-color .15s; }
   input:focus { border-color: var(--red); border-left-color: var(--red); }
+  input.bad { border-color: var(--red); border-left-color: var(--red); background:#1a1017; }
+  input.good { border-color:#3ddc84; border-left-color:#3ddc84; }
+
+  /* 密码框：右侧显示/隐藏按钮 */
+  .pw-wrap { position: relative; }
+  .pw-wrap input { padding-right: 58px; }
+  .pw-toggle { position:absolute; right:0; top:0; height:100%; width:52px; background:transparent;
+          border:none; border-left:1px solid #2c3a47; color:#8b97a3; cursor:pointer;
+          font-size:11px; letter-spacing:1px; text-transform:uppercase; }
+  .pw-toggle:hover { color: var(--red); }
+
+  /* 图形验证码：输入框 + 可点击刷新的 canvas */
+  .captcha { display:flex; gap:10px; align-items:stretch; }
+  .captcha input { flex:1; min-width:0; text-transform:uppercase; letter-spacing:4px; font-weight:700; }
+  .captcha canvas { width:130px; height:44px; flex:none; display:block; cursor:pointer;
+          border:1px solid #2c3a47; border-left:3px solid #2c3a47; background:#0f1923; }
+  .captcha canvas:hover { border-color: var(--red); border-left-color: var(--red); }
+  .captcha canvas.bad { border-color: var(--red); border-left-color: var(--red); }
+  .captcha-tip { font-size:11px; color:#8b97a3; margin-top:6px; letter-spacing:.5px; }
+
+  /* 密码强度条 */
+  .strength { display:flex; gap:4px; margin-top:8px; }
+  .strength i { flex:1; height:4px; background:#2c3a47; transition:.2s; }
+  .strength-txt { font-size:11px; color:#8b97a3; letter-spacing:1px; margin-top:6px; height:14px; }
+
   .row { display:flex; align-items:center; gap:8px; margin-top:14px; font-size:12px; letter-spacing:1px; text-transform:uppercase; }
   .row input { width:auto; }
+
   button.primary { width:100%; margin-top:20px; padding:14px; border:none; cursor:pointer;
           background:var(--red); color:#fff; font-size:15px; font-weight:800; letter-spacing:3px; text-transform:uppercase;
           clip-path: polygon(0 0,100% 0,100% 80%,94% 100%,0 100%); transition:.15s; }
   button.primary:hover { background:#ff5e6c; }
+  button.primary.ghost { background:#2c3a47; }
+
+  /* 登录 / 注册 切换链接 */
+  .switch { text-align:center; margin-top:16px; font-size:12px; letter-spacing:1px; color:#8b97a3; }
+  .switch a { color: var(--red); text-decoration:none; cursor:pointer; font-weight:700;
+              text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid transparent; }
+  .switch a:hover { border-bottom-color: var(--red); }
+
   .oauth { margin-top:20px; }
   .oauth-title { text-align:center; font-size:11px; letter-spacing:2px; color:#6b7682; text-transform:uppercase; margin:10px 0; }
   .oauth-btns { display:flex; gap:10px; }
   .oauth-btns button { flex:1; padding:11px; background:#0f1923; border:1px solid #2c3a47; color:#ece8e1;
           cursor:pointer; font-size:12px; letter-spacing:1px; text-transform:uppercase; }
   .oauth-btns button:hover { border-color:var(--red); color:var(--red); }
+
   .hint { font-size:11px; color:#8b97a3; margin-top:12px; line-height:1.6; letter-spacing:.5px; }
-  .error { background:rgba(255,70,85,.12); color:var(--red); border:1px solid rgba(255,70,85,.5);
-          padding:10px 12px; font-size:12px; letter-spacing:.5px; margin-bottom:14px; display:none; }
-  .step2,.dash { display:none; }
+  .msg { padding:10px 12px; font-size:12px; letter-spacing:.5px; margin-bottom:14px; display:none; line-height:1.6; }
+  .msg.error { background:rgba(255,70,85,.12); color:var(--red); border:1px solid rgba(255,70,85,.5); }
+  .msg.ok { background:rgba(61,220,132,.1); color:#3ddc84; border:1px solid rgba(61,220,132,.45); }
+
+  .step2,.dash,.regView { display:none; }
   .dash ul { padding-left:18px; font-size:14px; line-height:2; }
   .badge { display:inline-block; background:var(--red); color:#fff; padding:3px 9px; font-size:11px; letter-spacing:1px; text-transform:uppercase; }
 </style>
@@ -61,51 +105,101 @@
 <div class="bg"></div>
 
 <div class="card">
-  <!-- 模板1 + 模板4 + 模板6 -->
+  <!-- ===== 视图 1：登录 ===== -->
   <div id="loginView">
-    <span class="tag">模板1 · 基础账号密码登录</span>
+    <span class="tag">账号密码登录</span>
     <h1>登录</h1>
     <div class="sub">SIGN IN TO ENTER THE PROTOCOL</div>
-    <div class="error" id="err"></div>
+    <div class="msg error" id="err"></div>
 
     <label for="u">账号 / 邮箱</label>
     <input id="u" type="text" autocomplete="username" placeholder="AGENT ID">
 
     <label for="p">密码</label>
-    <input id="p" type="password" autocomplete="current-password" placeholder="PASSWORD">
+    <div class="pw-wrap">
+      <input id="p" type="password" autocomplete="current-password" placeholder="PASSWORD">
+      <button type="button" class="pw-toggle" onclick="togglePw('p',this)">显示</button>
+    </div>
+
+    <label for="cap">图形验证码</label>
+    <div class="captcha">
+      <input id="cap" type="text" maxlength="4" autocomplete="off" placeholder="输入右侧 4 位字符">
+      <canvas id="capCanvas" width="260" height="88" title="点击刷新验证码" onclick="refreshCaptcha()"></canvas>
+    </div>
+    <div class="captcha-tip">不区分大小写，看不清可点击图片刷新</div>
 
     <div class="row"><input id="rm" type="checkbox"><label for="rm" style="margin:0">记住我</label></div>
-    <div class="hint">⚡ 模板4：建议使用密码管理器自动填充，避免明文输入凭证。</div>
 
     <button class="primary" onclick="doLogin()">进入</button>
 
+    <div class="switch">还没有账号？<a onclick="showView('regView')">立即注册</a></div>
+
     <div class="oauth">
-      <div class="oauth-title">— 模板3 · 第三方账号登录 —</div>
+      <div class="oauth-title">— 第三方账号登录 —</div>
       <div class="oauth-btns">
         <button onclick="oauth('微信')">微信</button>
         <button onclick="oauth('Google')">Google</button>
         <button onclick="oauth('GitHub')">GitHub</button>
       </div>
     </div>
+
+    <div class="hint">⚡ 演示环境：内置账号 <b>agent / demo123</b>，也可点击「立即注册」自行创建账号（数据保存在浏览器本地）。</div>
   </div>
 
-  <!-- 模板2 -->
+  <!-- ===== 视图 2：注册（本次新增） ===== -->
+  <div id="regView" class="regView">
+    <span class="tag">注册新账号</span>
+    <h1>注册</h1>
+    <div class="sub">CREATE YOUR AGENT PROFILE</div>
+    <div class="msg error" id="errR"></div>
+    <div class="msg ok" id="okR"></div>
+
+    <label for="ru">账号 / 邮箱</label>
+    <input id="ru" type="text" autocomplete="username" placeholder="AGENT ID 或 EMAIL">
+
+    <label for="rp">设置密码</label>
+    <div class="pw-wrap">
+      <input id="rp" type="password" autocomplete="new-password" placeholder="至少 8 位，含字母与数字"
+             oninput="checkStrength()">
+      <button type="button" class="pw-toggle" onclick="togglePw('rp',this)">显示</button>
+    </div>
+    <div class="strength"><i id="s1"></i><i id="s2"></i><i id="s3"></i><i id="s4"></i></div>
+    <div class="strength-txt" id="sTxt">强度：—</div>
+
+    <label for="rp2">确认密码</label>
+    <div class="pw-wrap">
+      <input id="rp2" type="password" autocomplete="new-password" placeholder="再次输入密码">
+      <button type="button" class="pw-toggle" onclick="togglePw('rp2',this)">显示</button>
+    </div>
+
+    <div class="row"><input id="agree" type="checkbox"><label for="agree" style="margin:0">我已阅读并同意服务条款</label></div>
+
+    <button class="primary" onclick="doRegister()">创建账号</button>
+
+    <div class="switch">已有账号？<a onclick="showView('loginView')">返回登录</a></div>
+
+    <div class="hint">⚡ 演示环境：账号信息仅保存于当前浏览器本地（localStorage），密码经加盐摘要后存储，不会明文保存。真实项目请接入后端接口。</div>
+  </div>
+
+  <!-- ===== 视图 3：两步验证 ===== -->
   <div id="step2" class="step2">
-    <span class="tag">模板2 · 两步验证 2FA</span>
+    <span class="tag">两步验证 2FA</span>
     <h1>验证</h1>
     <div class="sub">ENTER SECURITY CODE</div>
-    <div class="error" id="err2"></div>
+    <div class="msg error" id="err2"></div>
     <label for="code">验证码</label>
-    <input id="code" type="text" inputmode="numeric" maxlength="6" placeholder="6 位数字">
+    <input id="code" type="text" inputmode="numeric" maxlength="6" placeholder="6 位数字（演示：任意 6 位）">
     <button class="primary" onclick="verify()">确认</button>
+    <div class="switch"><a onclick="goLogin()">返回登录</a></div>
   </div>
 
-  <!-- 模板5 -->
+  <!-- ===== 视图 4：登录后工作台 ===== -->
   <div id="dash" class="dash">
     <span class="badge">已登录</span>
-    <span class="tag">模板5 · 登录后执行任务</span>
+    <span class="tag">工作台</span>
     <h1>欢迎回来</h1>
-    <p style="font-size:13px;color:#8b97a3;letter-spacing:1px">登录成功，可继续以下任务：</p>
+    <p style="font-size:13px;color:#8b97a3;letter-spacing:1px">当前账号：<b id="who" style="color:#ece8e1"></b></p>
+    <p style="font-size:13px;color:#8b97a3;letter-spacing:1px;margin-top:6px">登录成功，可继续以下任务：</p>
     <ul>
       <li>导出本月战绩 CSV</li>
       <li>修改特工昵称</li>
@@ -116,28 +210,311 @@
 </div>
 
 <script>
-function show(id){document.getElementById(id).style.display='block';}
-function hide(id){document.getElementById(id).style.display='none';}
-function err(m){var e=document.getElementById('err');e.textContent=m;e.style.display=m?'block':'none';}
+/* ============================================================
+   工具函数
+   ============================================================ */
+var VIEWS = ['loginView','regView','step2','dash'];
 
-/* 模板1 + 模板6 */
+function showView(id){
+  VIEWS.forEach(function(v){ document.getElementById(v).style.display = 'none'; });
+  document.getElementById(id).style.display = 'block';
+}
+function msg(id, text, type){
+  var el = document.getElementById(id);
+  el.className = 'msg ' + (type || 'error');
+  el.textContent = text || '';
+  el.style.display = text ? 'block' : 'none';
+}
+function togglePw(inputId, btn){
+  var el = document.getElementById(inputId);
+  var show = el.type === 'password';
+  el.type = show ? 'text' : 'password';
+  btn.textContent = show ? '隐藏' : '显示';
+}
+
+/* ============================================================
+   图形验证码（canvas 绘制 + 校验）
+   ============================================================ */
+/* 去掉 0/O、1/I/L 等肉眼易混淆字符，避免用户误判 */
+var CAP_CHARS = 'ABCDEFGHJKMNPQRSTUVWXY23456789';
+var capAnswer = '';
+
+function makeCode(n){
+  var s = '';
+  for (var i = 0; i < n; i++){
+    s += CAP_CHARS.charAt(Math.floor(Math.random() * CAP_CHARS.length));
+  }
+  return s;
+}
+
+/* 绘制一张带干扰线与噪点的验证码图 */
+function drawCaptcha(){
+  var c = document.getElementById('capCanvas');
+  if (!c || !c.getContext) return;
+  var ctx = c.getContext('2d');
+  var W = c.width, H = c.height, i;
+
+  // 背景
+  ctx.fillStyle = '#0f1923';
+  ctx.fillRect(0, 0, W, H);
+
+  // 干扰线
+  ctx.lineWidth = 2;
+  for (i = 0; i < 7; i++){
+    ctx.strokeStyle = ['#2c3a47', '#3b4a5a', '#ff4655'][i % 3];
+    ctx.globalAlpha = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(Math.random() * W, Math.random() * H);
+    ctx.lineTo(Math.random() * W, Math.random() * H);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // 噪点
+  for (i = 0; i < 70; i++){
+    ctx.fillStyle = Math.random() > 0.5 ? '#55636f' : '#ff4655';
+    ctx.fillRect(Math.random() * W, Math.random() * H, 2, 2);
+  }
+
+  // 字符：随机字号、旋转、基线抖动
+  capAnswer = makeCode(4);
+  var colors = ['#ece8e1', '#ff4655', '#ece8e1', '#8b97a3'];
+  for (i = 0; i < capAnswer.length; i++){
+    ctx.save();
+    ctx.font = 'bold ' + (46 + Math.floor(Math.random() * 10)) + 'px "Arial Narrow", Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.translate(34 + i * 62, H / 2 + (Math.random() * 12 - 6));
+    ctx.rotate((Math.random() - 0.5) * 0.55);
+    ctx.fillText(capAnswer.charAt(i), 0, 0);
+    ctx.restore();
+  }
+}
+
+/* 刷新验证码并清空输入框 */
+function refreshCaptcha(){
+  drawCaptcha();
+  var el = document.getElementById('cap');
+  if (el){ el.value = ''; el.classList.remove('bad'); }
+  var cv = document.getElementById('capCanvas');
+  if (cv) cv.classList.remove('bad');
+}
+
+/* 校验用户输入（不区分大小写），失败自动刷新 */
+function checkCaptcha(){
+  var el = document.getElementById('cap');
+  var val = (el.value || '').trim().toUpperCase();
+  var cv = document.getElementById('capCanvas');
+
+  if (!val){
+    el.classList.add('bad');
+    return '请输入图形验证码';
+  }
+  if (val !== capAnswer.toUpperCase()){
+    el.classList.add('bad');
+    cv.classList.add('bad');
+    refreshCaptcha();
+    return '图形验证码不正确，已刷新，请重新输入';
+  }
+  el.classList.remove('bad');
+  cv.classList.remove('bad');
+  return '';
+}
+
+/* ============================================================
+   本地账号存储（纯前端演示，真实项目请换成后端接口）
+   ============================================================ */
+var DB_KEY = 'valorant_demo_accounts';
+
+function loadAccounts(){
+  try { return JSON.parse(localStorage.getItem(DB_KEY) || '{}'); }
+  catch(e){ return {}; }
+}
+function saveAccounts(db){
+  localStorage.setItem(DB_KEY, JSON.stringify(db));
+}
+
+/* 简单加盐摘要：仅用于避免明文落盘，不能替代真实加密 */
+function hashPwd(pwd, salt){
+  var str = salt + '::' + pwd, h = 5381;
+  for (var i = 0; i < str.length; i++){
+    h = ((h << 5) + h + str.charCodeAt(i)) >>> 0;
+  }
+  return 'v1$' + h.toString(16);
+}
+function makeSalt(){
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+}
+
+/* 内置演示账号（首次访问时自动写入） */
+(function seedDemo(){
+  var db = loadAccounts();
+  if (!db['agent']) {
+    var s = makeSalt();
+    db['agent'] = { salt: s, pwd: hashPwd('demo123', s), created: '内置演示账号' };
+    saveAccounts(db);
+  }
+})();
+
+/* ============================================================
+   注册
+   ============================================================ */
+function cleanMsgR(){ msg('errR',''); msg('okR',''); }
+
+/* 密码强度：长度 + 大小写 + 数字 + 符号 */
+function scorePassword(p){
+  var s = 0;
+  if (p.length >= 8) s++;
+  if (p.length >= 12) s++;
+  if (/[a-z]/.test(p) && /[A-Z]/.test(p)) s++;
+  if (/\d/.test(p)) s++;
+  if (/[^A-Za-z0-9]/.test(p)) s++;
+  return Math.min(s, 4);
+}
+function checkStrength(){
+  var p = document.getElementById('rp').value;
+  var s = scorePassword(p);
+  var colors = ['#2c3a47','#ff4655','#ff9f43','#3ddc84','#3ddc84'];
+  var texts  = ['强度：—','强度：弱','强度：中','强度：强','强度：很强'];
+  for (var i = 1; i <= 4; i++){
+    document.getElementById('s' + i).style.background = (i <= s) ? colors[s] : '#2c3a47';
+  }
+  document.getElementById('sTxt').textContent = p ? texts[s] : texts[0];
+}
+
+function doRegister(){
+  cleanMsgR();
+  var u  = document.getElementById('ru').value.trim();
+  var p  = document.getElementById('rp').value;
+  var p2 = document.getElementById('rp2').value;
+  var ok = document.getElementById('agree').checked;
+
+  // —— 表单校验 ——
+  if (!u || !p || !p2){ msg('errR','账号与密码均不能为空'); return; }
+  if (!/^[A-Za-z0-9_.-]{3,20}$/.test(u) && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(u)){
+    msg('errR','账号需为 3–20 位字母/数字/_.-，或填写合法邮箱'); return;
+  }
+  if (p.length < 8){ msg('errR','密码长度至少 8 位'); return; }
+  if (!/[A-Za-z]/.test(p) || !/\d/.test(p)){ msg('errR','密码需同时包含字母和数字'); return; }
+  if (p !== p2){ msg('errR','两次输入的密码不一致'); return; }
+  if (!ok){ msg('errR','请先阅读并同意服务条款'); return; }
+
+  // —— 查重 ——
+  var db = loadAccounts();
+  var key = u.toLowerCase();
+  if (db[key]){ msg('errR','该账号已被注册，请更换或直接登录'); return; }
+
+  // —— 写入 ——
+  var salt = makeSalt();
+  db[key] = { salt: salt, pwd: hashPwd(p, salt), created: new Date().toLocaleString('zh-CN') };
+  saveAccounts(db);
+
+  msg('okR', '注册成功！正在跳转到登录页…', 'ok');
+  setTimeout(function(){
+    // 预填账号，清空注册表单
+    document.getElementById('u').value = u;
+    document.getElementById('rm').checked = true;
+    document.getElementById('ru').value = '';
+    document.getElementById('rp').value = '';
+    document.getElementById('rp2').value = '';
+    document.getElementById('agree').checked = false;
+    checkStrength();
+    cleanMsgR();
+    refreshCaptcha();
+    showView('loginView');
+    msg('err', '账号 ' + u + ' 创建成功，请输入密码与验证码登录。', 'ok');
+  }, 900);
+}
+
+/* ============================================================
+   登录
+   ============================================================ */
 function doLogin(){
-  err('');
-  var u=document.getElementById('u').value.trim(), p=document.getElementById('p').value;
-  if(!u||!p){err('账号与密码不能为空');return;}
-  if(p.length<6){err('密码错误（演示：长度需 ≥ 6）');return;}
-  hide('loginView');show('step2');
+  msg('err','');
+  var u = document.getElementById('u').value.trim();
+  var p = document.getElementById('p').value;
+
+  if (!u || !p){ msg('err','账号与密码不能为空'); return; }
+
+  // —— 校验图形验证码：放在账号密码校验之前，防止被用来探测账号是否存在 ——
+  var capErr = checkCaptcha();
+  if (capErr){ msg('err', capErr); return; }
+
+  var db = loadAccounts();
+  var rec = db[u.toLowerCase()];
+
+  if (!rec){
+    msg('err','该账号尚未注册，请先点击「立即注册」创建账号。');
+    refreshCaptcha();
+    return;
+  }
+  if (rec.pwd !== hashPwd(p, rec.salt)){
+    msg('err','账号或密码错误，请重新输入。');
+    refreshCaptcha();
+    return;
+  }
+
+  // 记住我：保存账号，下次自动填充
+  if (document.getElementById('rm').checked){
+    localStorage.setItem('valorant_demo_last', u);
+  } else {
+    localStorage.removeItem('valorant_demo_last');
+  }
+
+  currentUser = u;
+  refreshCaptcha();          // 进入 2FA 后刷新，避免旧验证码被重复使用
+  showView('step2');
 }
-/* 模板2 */
+
+/* 页面加载：回填「记住我」的账号 + 生成验证码 */
+window.addEventListener('load', function(){
+  var last = localStorage.getItem('valorant_demo_last');
+  if (last){
+    document.getElementById('u').value = last;
+    document.getElementById('rm').checked = true;
+  }
+  drawCaptcha();
+});
+
+/* ============================================================
+   两步验证 / 第三方登录 / 退出
+   ============================================================ */
+var currentUser = '';
+
+/* 回到登录页：清提示并换一张新验证码 */
+function goLogin(){
+  msg('err','');
+  refreshCaptcha();
+  showView('loginView');
+}
+
 function verify(){
-  var e=document.getElementById('err2'),c=document.getElementById('code').value.trim();
-  if(!/^\d{6}$/.test(c)){e.textContent='验证码格式不正确（需 6 位数字）';e.style.display='block';return;}
-  hide('step2');show('dash');
+  var c = document.getElementById('code').value.trim();
+  if (!/^\d{6}$/.test(c)){
+    msg('err2','验证码格式不正确（需 6 位数字）');
+    return;
+  }
+  msg('err2','');
+  document.getElementById('who').textContent = currentUser;
+  showView('dash');
 }
-/* 模板3 */
-function oauth(n){err('');alert('即将跳转 '+n+' 授权页（演示）。\n实际：确认账号 → 授权 → 跳回。');hide('loginView');show('dash');}
-/* 模板5 收尾 */
-function logout(){hide('dash');show('loginView');document.getElementById('u').value='';document.getElementById('p').value='';}
+
+function oauth(name){
+  msg('err','');
+  alert('即将跳转 ' + name + ' 授权页（演示）。\n实际流程：确认账号 → 授权 → 跳回。');
+  currentUser = name + ' 用户';
+  document.getElementById('who').textContent = currentUser;
+  showView('dash');
+}
+
+function logout(){
+  document.getElementById('p').value = '';
+  document.getElementById('code').value = '';
+  msg('err','');
+  refreshCaptcha();
+  showView('loginView');
+}
 </script>
 </body>
 </html>
