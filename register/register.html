@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VALORANT 风格 · 注册</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  :root { --red:#ff4655; --dark:#0f1923; --panel:#1b2733; }
+
+  body { font-family: "Arial Narrow", "Oswald", "Microsoft YaHei", sans-serif;
+         min-height: 100vh; background: var(--dark); color: #ece8e1;
+         display: flex; align-items: center; justify-content: center; padding: 40px 16px; }
+
+  /* 动态背景（英雄图缺失时自动降级为深色渐变） */
+  .bg { position: fixed; inset: 0; z-index: 0; overflow: hidden;
+        background:
+          url('valorant-hero.png') center center / cover no-repeat,
+          radial-gradient(circle at 20% 15%, #22303d 0%, #0f1923 60%),
+          var(--dark);
+        animation: kenburns 22s ease-in-out infinite alternate; transform-origin: center; }
+  @keyframes kenburns { from{ transform: scale(1) translate(0,0);} to{ transform: scale(1.14) translate(-2%, -2%);} }
+  .bg::after { content:""; position:absolute; inset:0;
+        background:
+          radial-gradient(circle at 50% 40%, rgba(255,70,85,.18), transparent 55%),
+          linear-gradient(90deg, rgba(15,25,35,.85) 0%, rgba(15,25,35,.45) 55%, rgba(15,25,35,.85) 100%),
+          rgba(15,25,35,.45); }
+
+  /* VALORANT 切角卡片 */
+  .card { position: relative; z-index: 1; width: 420px; max-width: 100%; background: var(--panel);
+          padding: 34px 30px 30px; clip-path: polygon(0 0, 100% 0, 100% 92%, 92% 100%, 0 100%);
+          box-shadow: 0 0 0 1px rgba(255,70,85,.4), 0 24px 60px rgba(0,0,0,.6); }
+  .card::before { content:""; position:absolute; left:0; top:0; width:5px; height:54px; background:var(--red); }
+  h1 { font-size: 30px; letter-spacing: 3px; text-transform: uppercase; font-weight: 800;
+       transform: scaleY(1.15); margin: 6px 0 2px; }
+  .sub { color:#8b97a3; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 18px; }
+  .tag { display:inline-block; background: rgba(255,70,85,.15); color: var(--red);
+         font-size: 11px; letter-spacing: 1px; padding: 3px 8px; margin-bottom: 8px; text-transform: uppercase; }
+  label { font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color:#a7b0ba;
+          display:block; margin: 14px 0 6px; }
+  input { width: 100%; padding: 12px 13px; border: 1px solid #2c3a47; border-left: 3px solid #2c3a47;
+          background:#0f1923; color:#ece8e1; font-size: 14px; outline:none; border-radius:0;
+          transition: border-color .15s; }
+  input:focus { border-color: var(--red); border-left-color: var(--red); }
+  input.bad { border-color: var(--red); border-left-color: var(--red); background:#1a1017; }
+  input.good { border-color:#3ddc84; border-left-color:#3ddc84; }
+
+  .pw-wrap { position: relative; }
+  .pw-wrap input { padding-right: 58px; }
+  .pw-toggle { position:absolute; right:0; top:0; height:100%; width:52px; background:transparent;
+          border:none; border-left:1px solid #2c3a47; color:#8b97a3; cursor:pointer;
+          font-size:11px; letter-spacing:1px; text-transform:uppercase; }
+  .pw-toggle:hover { color: var(--red); }
+
+  /* 密码强度条 */
+  .strength { display:flex; gap:4px; margin-top:8px; }
+  .strength i { flex:1; height:4px; background:#2c3a47; transition:.2s; }
+  .strength-txt { font-size:11px; color:#8b97a3; letter-spacing:1px; margin-top:6px; height:14px; }
+
+  .row { display:flex; align-items:center; gap:8px; margin-top:14px; font-size:12px; letter-spacing:1px; text-transform:uppercase; }
+  .row input { width:auto; }
+  .row a { color: var(--red); text-decoration: none; }
+
+  button.primary { width:100%; margin-top:20px; padding:14px; border:none; cursor:pointer;
+          background:var(--red); color:#fff; font-size:15px; font-weight:800; letter-spacing:3px; text-transform:uppercase;
+          clip-path: polygon(0 0,100% 0,100% 80%,94% 100%,0 100%); transition:.15s; }
+  button.primary:hover { background:#ff5e6c; }
+  button.primary:disabled { opacity:.6; cursor:not-allowed; }
+
+  .switch { text-align:center; margin-top:16px; font-size:12px; letter-spacing:1px; color:#8b97a3; }
+  .switch a { color: var(--red); text-decoration:none; cursor:pointer; font-weight:700;
+              text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid transparent; }
+  .switch a:hover { border-bottom-color: var(--red); }
+
+  .hint { font-size:11px; color:#8b97a3; margin-top:12px; line-height:1.6; letter-spacing:.5px; }
+  .msg { padding:10px 12px; font-size:12px; letter-spacing:.5px; margin-bottom:14px; display:none; line-height:1.6; }
+  .msg.error { background:rgba(255,70,85,.12); color:var(--red); border:1px solid rgba(255,70,85,.5); }
+  .msg.ok { background:rgba(61,220,132,.1); color:#3ddc84; border:1px solid rgba(61,220,132,.45); }
+</style>
+</head>
+<body>
+<div class="bg"></div>
+
+<div class="card">
+  <span class="tag">注册新账号</span>
+  <h1>注册</h1>
+  <div class="sub">CREATE YOUR AGENT PROFILE</div>
+  <div class="msg error" id="errR"></div>
+  <div class="msg ok" id="okR"></div>
+
+  <label for="ru">账号 / 邮箱</label>
+  <input id="ru" type="text" autocomplete="username" placeholder="AGENT ID 或 EMAIL">
+
+  <label for="rp">设置密码</label>
+  <div class="pw-wrap">
+    <input id="rp" type="password" autocomplete="new-password" placeholder="至少 8 位，含字母与数字"
+           oninput="checkStrength()">
+    <button type="button" class="pw-toggle" onclick="togglePw('rp',this)">显示</button>
+  </div>
+  <div class="strength"><i id="s1"></i><i id="s2"></i><i id="s3"></i><i id="s4"></i></div>
+  <div class="strength-txt" id="sTxt">强度：—</div>
+
+  <label for="rp2">确认密码</label>
+  <div class="pw-wrap">
+    <input id="rp2" type="password" autocomplete="new-password" placeholder="再次输入密码">
+    <button type="button" class="pw-toggle" onclick="togglePw('rp2',this)">显示</button>
+  </div>
+
+  <div class="row"><input id="agree" type="checkbox"><label for="agree" style="margin:0">我已阅读并同意<a href="#" onclick="return false">服务条款</a></label></div>
+
+  <button class="primary" id="regBtn" onclick="doRegister()">创建账号</button>
+
+  <div class="switch">已有账号？<a href="index.html">返回登录</a></div>
+
+  <div class="hint">⚡ 账号信息通过后端接口写入 MySQL（MyBatis-Plus），密码经随机盐 + SHA-256 哈希存储，绝不保存明文。</div>
+</div>
+
+<script>
+/* 接口地址：若由后端同源托管则使用相对路径；若以 file:// 直接打开则回退到 localhost:8080 */
+var API_BASE = location.origin.startsWith('http') ? '' : 'http://localhost:8080';
+var API_URL = API_BASE + '/api/users/register';
+
+function msg(id, text, type){
+  var el = document.getElementById(id);
+  el.className = 'msg ' + (type || 'error');
+  el.textContent = text || '';
+  el.style.display = text ? 'block' : 'none';
+}
+function cleanMsgR(){ msg('errR',''); msg('okR',''); }
+
+function togglePw(inputId, btn){
+  var el = document.getElementById(inputId);
+  var show = el.type === 'password';
+  el.type = show ? 'text' : 'password';
+  btn.textContent = show ? '隐藏' : '显示';
+}
+
+/* 密码强度：长度 + 大小写 + 数字 + 符号 */
+function scorePassword(p){
+  var s = 0;
+  if (p.length >= 8) s++;
+  if (p.length >= 12) s++;
+  if (/[a-z]/.test(p) && /[A-Z]/.test(p)) s++;
+  if (/\d/.test(p)) s++;
+  if (/[^A-Za-z0-9]/.test(p)) s++;
+  return Math.min(s, 4);
+}
+function checkStrength(){
+  var p = document.getElementById('rp').value;
+  var s = scorePassword(p);
+  var colors = ['#2c3a47','#ff4655','#ff9f43','#3ddc84','#3ddc84'];
+  var texts  = ['强度：—','强度：弱','强度：中','强度：强','强度：很强'];
+  for (var i = 1; i <= 4; i++){
+    document.getElementById('s' + i).style.background = (i <= s) ? colors[s] : '#2c3a47';
+  }
+  document.getElementById('sTxt').textContent = p ? texts[s] : texts[0];
+}
+
+/* 前端轻量校验，与后端规则一致；后端为最终校验 */
+function doRegister(){
+  cleanMsgR();
+  var u  = document.getElementById('ru').value.trim();
+  var p  = document.getElementById('rp').value;
+  var p2 = document.getElementById('rp2').value;
+  var ok = document.getElementById('agree').checked;
+  var btn = document.getElementById('regBtn');
+
+  if (!u || !p || !p2){ msg('errR','账号与密码均不能为空'); return; }
+  if (!/^[A-Za-z0-9_.-]{3,20}$/.test(u) && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(u)){
+    msg('errR','账号需为 3–20 位字母/数字/_.-，或填写合法邮箱'); return;
+  }
+  if (p.length < 8){ msg('errR','密码长度至少 8 位'); return; }
+  if (!/[A-Za-z]/.test(p) || !/\d/.test(p)){ msg('errR','密码需同时包含字母和数字'); return; }
+  if (p !== p2){ msg('errR','两次输入的密码不一致'); return; }
+  if (!ok){ msg('errR','请先阅读并同意服务条款'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '创建中…';
+
+  fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ account: u, password: p, confirmPassword: p2, agree: true })
+  })
+  .then(function(res){ return res.json().then(function(d){ return { status: res.status, body: d }; }); })
+  .then(function(r){
+    btn.disabled = false;
+    btn.textContent = '创建账号';
+    if (r.body && r.body.code === 0){
+      msg('okR', (r.body.message || '注册成功！') + ' 即将跳转到登录页…', 'ok');
+      setTimeout(function(){
+        // 预填账号并跳转到登录页
+        try { localStorage.setItem('valorant_last_account', u); } catch(e){}
+        window.location.href = 'index.html';
+      }, 1100);
+    } else {
+      msg('errR', (r.body && r.body.message) ? r.body.message : '注册失败，请稍后重试');
+    }
+  })
+  .catch(function(){
+    btn.disabled = false;
+    btn.textContent = '创建账号';
+    msg('errR', '网络错误：无法连接后端（' + API_URL + '）。请确认后端已启动。');
+  });
+}
+</script>
+</body>
+</html>
