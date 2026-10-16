@@ -82,4 +82,12 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:5173   # 前端
 19. **AI 在 Git Bash 里用 sed/iconv 编辑 GBK 的 .bat 会被剥掉 CRLF 变成 LF**（导致 goto/标签解析错乱），改完必须检查并补回：`python -c "d=open(f,'rb').read(); open(f,'wb').write(d.replace(b'\r\n',b'\n').replace(b'\n',b'\r\n'))"`。PowerShell 通道改 bat 可能因内容含 `%n%` 之类被沙箱误拦，用 python 改最稳
 20. **用户会误双击 run.bat 当一键启动**（2026-10-14 实际发生：以为会开网页，结果只有后端）。已在 run.bat 输出里加引导提示"本脚本只启动后端，一键启动请双击 start-all.bat"。排查此类问题的关键证据：`Get-CimInstance Win32_Process` 看进程的 ParentProcessId + CommandLine，explorer 直接启动的 cmd = 用户双击的脚本
 
+## 2026-10-16 目录清理
 
+- Desktop 上原有三份重复副本（java2-main\java2-main\workSpace 最新版 / 顶层旧 workSpace / 顶层旧 one-punch-login-vue），已清理：最新版上移为 **Desktop\java2-main\workSpace**（唯一有效副本），旧 workSpace 进回收站，旧前端副本在 java2-main\_old_backup\n- 所有脚本用 %~dp0 相对路径，位置变了不影响；以后双击 Desktop\java2-main\workSpace\start-all.bat 即可
+
+## 2026-10-16 补充
+
+- npm optional deps bug 复现且加重：即使删 lock+node_modules 全新重装，`@rolldown/binding-win32-x64-msvc` 仍不会被装上（lock 里有记录、平台 win32/x64 匹配、npm 却报 up to date）。AI 会话内可靠修复法：`npm pack @rolldown/binding-win32-x64-msvc@1.2.14` 后 tar 解压到 node_modules/@rolldown/binding-win32-x64-msvc --strip-components=1（已验证 vite 8.3.4 正常启动）。start.bat 的删 lock 重装自愈逻辑对用户双击场景仍有效，可保留
+- 本次 AI 启动全链路验证通过（后端 8080 / 前端 5173 / 登录接口返回 code 200）
+- 2026-10-16 前端改版：登录成功 → LoadingOverlay.vue（充能动画）→ HomePage.vue（整页首页：导航栏+搜索栏+英雄卡片墙，亮黄漫画风）。view 状态：login|register|loading|home。旧 HomeCard.vue 已弃用未删

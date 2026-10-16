@@ -3,11 +3,12 @@ import { ref } from 'vue'
 import SaitamaHero from './components/SaitamaHero.vue'
 import LoginCard from './components/LoginCard.vue'
 import RegisterCard from './components/RegisterCard.vue'
-import HomeCard from './components/HomeCard.vue'
+import HomePage from './components/HomePage.vue'
+import LoadingOverlay from './components/LoadingOverlay.vue'
 import { login, register } from './api'
 
-// 全局状态：协调琦玉动画与登录/注册/主页卡片
-const view = ref('login')    // 当前视图：login | register | home
+// 全局状态：协调琦玉动画与登录/注册/加载/主页
+const view = ref('login')    // 当前视图：login | register | loading | home
 const serious = ref(false)   // 认真脸
 const punching = ref(false)  // 出拳动画
 const hitting = ref(false)   // 按钮闪光
@@ -62,10 +63,10 @@ async function onLogin({ username, password, linkTip }) {
     try {
       const res = await login({ username, password })
       if (res.code === 200) {
-        // 登录成功 → 进入英雄主页
+        // 登录成功 → 先播放"接入英雄协会系统"加载动画，再进入首页
         user.value = res.data
         message.value = null
-        setTimeout(() => { view.value = 'home' }, 350)
+        setTimeout(() => { view.value = 'loading' }, 350)
       } else {
         showTip(res.message || '登录失败', 'err')
       }
@@ -112,12 +113,12 @@ async function onRegister({ codename, email, password, confirmPwd, heroClass }) 
   })
 }
 
-// ===== 主页 =====
-function onPatrol() {
-  // 外出巡逻：播放出拳动画
-  punchEffect(() => {})
+// ===== 加载动画完成 → 进入首页 =====
+function onLoadingDone() {
+  view.value = 'home'
 }
 
+// ===== 首页 =====
 function onLogout() {
   user.value = null
   view.value = 'login'
@@ -139,20 +140,21 @@ function showTip(text, type) {
   <div class="halftone"></div>
   <div class="impact-text" :class="{ show: showImpact }">轰！！</div>
 
-  <div class="stage">
+  <!-- 登录成功后的加载过渡动画 -->
+  <LoadingOverlay v-if="view === 'loading'" @done="onLoadingDone" />
+
+  <!-- 登录后的英雄协会首页（整页） -->
+  <HomePage
+    v-else-if="view === 'home'"
+    :hero="user"
+    @logout="onLogout"
+  />
+
+  <div v-else class="stage">
     <SaitamaHero :serious="serious" :punching="punching" />
 
-    <!-- 登录后的英雄主页 -->
-    <HomeCard
-      v-if="view === 'home'"
-      :hero="user"
-      :hitting="hitting"
-      @patrol="onPatrol"
-      @logout="onLogout"
-    />
-
     <LoginCard
-      v-else-if="view === 'login'"
+      v-if="view === 'login'"
       :message="message"
       :hitting="hitting"
       @focus-change="onFocusChange"
