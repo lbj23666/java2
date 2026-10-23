@@ -1,79 +1,126 @@
 <script setup>
-import { computed, ref } from 'vue'
-
 // 英雄协会首页（登录成功后进入）
 // 风格：一拳超人海报风 —— 亮黄底、粗黑描边、漫画网点、红/绿/紫点缀
-// 功能：顶部导航栏（菜单 + 当前英雄 + 退出）、搜索栏（关键词搜索 + 等级筛选）、英雄图鉴卡片墙
+// 功能：顶部导航栏（板块切换 + 当前英雄 + 退出）
+//       首页：四大板块入口 + 跨板块全局搜索
+//       各板块：关键词搜索 + 该板块专属筛选 + 排序 + 结果高亮
 // props:
 //   hero - 登录返回的英雄信息 { id, username, email, heroClass }
 // emits:
 //   logout - 退出登录
+import { computed, ref, watch } from 'vue'
+import SearchPanel from './SearchPanel.vue'
+import ResultCard from './ResultCard.vue'
+import { catalog, LEVEL_ORDER, itemSearchText } from '../data/catalog'
+import { matches } from '../utils/search'
+
 const props = defineProps({
   hero: { type: Object, required: true }
 })
 const emit = defineEmits(['logout'])
 
-const keyword = ref('')
-const rankFilter = ref('all')
+const sections = catalog
 
-const navItems = ['首页', '英雄图鉴', '怪人通缉', '灾害预警', '协会公告']
-
-// 英雄图鉴数据（本地静态，一拳超人角色）
-const heroes = [
-  { name: '琦玉', alias: '秃头披风侠', rank: 'S', tag: '一拳解决，兴趣使然的英雄' },
-  { name: '杰诺斯', alias: '魔鬼改造人', rank: 'S', tag: '焚毁炮全功率输出，S级新人王' },
-  { name: '战栗的龙卷', alias: '龙卷', rank: 'S', tag: '念动力大师，别惹她生气' },
-  { name: '银色獠牙', alias: '邦古', rank: 'S', tag: '流水岩碎拳宗师，武道泰斗' },
-  { name: '金属骑士', alias: '波佛伊博士', rank: 'S', tag: '远程操控的机械军团' },
-  { name: '闪光弗莱士', alias: 'Flash', rank: 'S', tag: '神速剑术，快过闪电' },
-  { name: '僵尸侠', alias: 'Zombieman', rank: 'S', tag: '不死之身，无限再生' },
-  { name: '金属球棒', alias: '不良少年', rank: 'S', tag: '气势越高越强，一根球棒走天下' },
-  { name: '背心尊者', alias: '背心军团长', rank: 'S', tag: '背心就是力量' },
-  { name: '甜心假面', alias: 'Amai Mask', rank: 'A', tag: '偶像兼英雄，颜值即正义' },
-  { name: '地狱的吹雪', alias: '吹雪组组长', rank: 'B', tag: '超能力姐妹中的妹妹，务实派' },
-  { name: '无证骑士', alias: 'C级英雄', rank: 'C', tag: '自行车巡逻，永不放弃的男人' },
-]
-
-const rankMeta = {
-  S: { label: 'S级', color: '#d03a2c' },
-  A: { label: 'A级', color: '#2a6fb8' },
-  B: { label: 'B级', color: '#2f8f46' },
-  C: { label: 'C级', color: '#8a7a63' },
+// 首页用的「伪板块」：没有筛选和排序，只做跨板块关键词搜索
+const homeSection = {
+  key: 'home',
+  label: '全部板块',
+  placeholder: '跨板块搜索：英雄、怪人、灾害、公告…',
+  hotwords: ['琦玉', '龙级', '在逃', '紧急', 'A市'],
+  filters: [],
+  sorts: []
 }
 
-const rankChips = [
-  { key: 'all', label: '全部' },
-  { key: 'S', label: 'S级' },
-  { key: 'A', label: 'A级' },
-  { key: 'B', label: 'B级' },
-  { key: 'C', label: 'C级' },
-]
+const activeKey = ref('home')
+const keyword = ref('')
+const filters = ref({})
+const sortKey = ref('')
 
-// 搜索 + 等级筛选
-const filteredHeroes = computed(() => {
-  const kw = keyword.value.trim().toLowerCase()
-  return heroes.filter(h => {
-    const rankOk = rankFilter.value === 'all' || h.rank === rankFilter.value
-    const kwOk = !kw ||
-      h.name.toLowerCase().includes(kw) ||
-      h.alias.toLowerCase().includes(kw) ||
-      h.tag.toLowerCase().includes(kw)
-    return rankOk && kwOk
-  })
+const current = computed(() => sections.find((s) => s.key === activeKey.value))
+
+/** 板块已配置的所有筛选组，值默认 all */
+function defaultFilters(section) {
+  const f = {}
+  section.filters.forEach((g) => { f[g.key] = 'all' })
+  return f
+}
+
+// 切换板块时重置关键词与筛选，避免上一板块的条件残留
+watch(activeKey, (key) => {
+  const s = sections.find((x) => x.key === key)
+  keyword.value = ''
+  if (s) {
+    filters.value = defaultFilters(s)
+    sortKey.value = s.sorts[0]?.k || ''
+  } else {
+    filters.value = {}
+    sortKey.value = ''
+  }
+}, { immediate: true })
+
+/** 通用比较器：各板块的 sorts key 在这里统一解释 */
+function comparator(section, key) {
+  const ord = LEVEL_ORDER[section.key] || {}
+  if (key === 'name') return (a, b) => String(a.name).localeCompare(String(b.name), 'zh-Hans-CN')
+  if (key === 'time') return (a, b) => (b.ts || 0) - (a.ts || 0)
+  if (key === 'power' || key === 'bounty') return (a, b) => (b.weight || 0) - (a.weight || 0)
+  // 默认按等级降序，同等级再按权重降序
+  return (a, b) =>
+    (ord[b.level] ?? 0) - (ord[a.level] ?? 0) || (b.weight || 0) - (a.weight || 0)
+}
+
+/** 在单个板块内搜索（关键词 + 该板块筛选 + 排序） */
+function searchIn(section, kw = keyword.value, state = null) {
+  let list = section.items.filter((it) =>
+    section.filters.every((g) => {
+      const selected = state ? state[g.key] : filters.value[g.key]
+      return !selected || selected === 'all' || it[g.key] === selected
+    })
+  )
+  if (String(kw ?? '').trim()) {
+    list = list.filter((it) => matches(itemSearchText(it, section), kw))
+  }
+  const cmp = comparator(section, section === current.value ? sortKey.value : section.sorts[0]?.k)
+  return cmp ? [...list].sort(cmp) : list
+}
+
+const results = computed(() => (current.value ? searchIn(current.value) : []))
+
+// 首页跨板块搜索：按板块分组，只保留有命中的板块
+const grouped = computed(() => {
+  const kw = keyword.value
+  if (!String(kw ?? '').trim()) return []
+  return sections
+    .map((s) => ({ section: s, hits: searchIn(s, kw, {}) }))
+    .filter((g) => g.hits.length > 0)
 })
 
-const memberNo = computed(() => 'HA-' + String(props.hero?.id ?? 0).padStart(4, '0'))
-const userRank = computed(() => rankMeta[props.hero?.heroClass] || rankMeta.C)
+const totalHits = computed(() => grouped.value.reduce((n, g) => n + g.hits.length, 0))
 
-function doSearch() {
-  // 输入即实时过滤，按钮点击时给一个聚焦反馈即可
+const activeFilterCount = computed(() =>
+  current.value
+    ? current.value.filters.filter((g) => filters.value[g.key] && filters.value[g.key] !== 'all').length
+    : 0
+)
+
+function selectSection(key) {
+  activeKey.value = key
 }
+
+function resetAll() {
+  keyword.value = ''
+  if (current.value) filters.value = defaultFilters(current.value)
+}
+
+const memberNo = computed(() => 'HA-' + String(props.hero?.id ?? 0).padStart(4, '0'))
+const userRankColor = computed(() => {
+  const map = { S: '#d03a2c', A: '#2a6fb8', B: '#2f8f46', C: '#8a7a63' }
+  return map[props.hero?.heroClass] || map.C
+})
 </script>
 
 <template>
   <div class="home">
-    <div class="dots"></div>
-
     <!-- ===== 顶部导航栏 ===== -->
     <header class="navbar">
       <div class="logo">
@@ -86,16 +133,23 @@ function doSearch() {
 
       <nav class="menu">
         <a
-          v-for="(item, i) in navItems"
-          :key="item"
           href="#"
-          :class="{ active: i === 0 }"
-          @click.prevent
-        >{{ item }}</a>
+          class="nav-item"
+          :class="{ active: activeKey === 'home' }"
+          @click.prevent="selectSection('home')"
+        >首页</a>
+        <a
+          v-for="s in sections"
+          :key="s.key"
+          href="#"
+          class="nav-item"
+          :class="{ active: activeKey === s.key }"
+          @click.prevent="selectSection(s.key)"
+        >{{ s.label }}</a>
       </nav>
 
       <div class="user-chip">
-        <span class="avatar" :style="{ background: userRank.color }">{{ hero.heroClass }}</span>
+        <span class="avatar" :style="{ background: userRankColor }">{{ hero.heroClass }}</span>
         <div class="who">
           <strong>{{ hero.username }}</strong>
           <small>{{ memberNo }}</small>
@@ -104,63 +158,105 @@ function doSearch() {
       </div>
     </header>
 
-    <!-- ===== 搜索区 ===== -->
-    <section class="hero-zone">
-      <h1 class="big-title">英雄<span>图鉴</span></h1>
-      <p class="slogan">兴趣使然的英雄们，都在这里集结</p>
+    <!-- ===== 首页：概览 + 跨板块搜索 ===== -->
+    <section v-if="activeKey === 'home'" class="hero-zone">
+      <h1 class="big-title">英雄<span>协会</span></h1>
+      <p class="slogan">四大板块，一拳掌握 · Ctrl+K 快速搜索</p>
 
-      <div class="search-bar">
-        <input
-          v-model="keyword"
-          type="text"
-          placeholder="搜索英雄 / 称号 / 关键词，比如：龙卷、S级、球棒…"
-          @keyup.enter="doSearch"
-        />
-        <button class="btn-search" @click="doSearch">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
-            <circle cx="10.5" cy="10.5" r="6.5"/>
-            <path d="M15.5 15.5 L21 21"/>
-          </svg>
-          搜索
-        </button>
+      <SearchPanel
+        :keyword="keyword"
+        :section="homeSection"
+        :filters="filters"
+        :sort-key="sortKey"
+        :count="totalHits"
+        :total="sections.reduce((n, s) => n + s.items.length, 0)"
+        @update:keyword="keyword = $event"
+        @update:filters="filters = $event"
+        @update:sort-key="sortKey = $event"
+      />
+
+      <!-- 跨板块搜索结果 -->
+      <div v-if="keyword.trim()" class="grouped">
+        <p v-if="totalHits === 0" class="no-hit">
+          没有找到「{{ keyword }}」相关内容 —— 也许已经被琦玉一拳清场了
+        </p>
+        <div v-for="g in grouped" :key="g.section.key" class="group">
+          <div class="group-head">
+            <span class="g-icon" :style="{ background: g.section.accent }">{{ g.section.icon }}</span>
+            <strong>{{ g.section.label }}</strong>
+            <span class="g-count">{{ g.hits.length }} 条</span>
+            <button class="g-more" @click="selectSection(g.section.key)">查看全部 →</button>
+          </div>
+          <div class="grid">
+            <ResultCard
+              v-for="it in g.hits.slice(0, 4)"
+              :key="it.id"
+              :item="it"
+              :section="g.section"
+              :keyword="keyword"
+            />
+          </div>
+        </div>
       </div>
 
-      <div class="chips">
+      <!-- 板块入口 -->
+      <div v-else class="entries">
         <button
-          v-for="chip in rankChips"
-          :key="chip.key"
-          class="chip"
-          :class="{ on: rankFilter === chip.key }"
-          @click="rankFilter = chip.key"
-        >{{ chip.label }}</button>
-        <span class="count">共 {{ filteredHeroes.length }} 位英雄</span>
+          v-for="s in sections"
+          :key="s.key"
+          class="entry"
+          :style="{ '--accent': s.accent }"
+          @click="selectSection(s.key)"
+        >
+          <span class="e-icon" :style="{ background: s.accent }">{{ s.icon }}</span>
+          <strong>{{ s.label }}</strong>
+          <small>{{ s.slogan }}</small>
+          <span class="e-count">{{ s.items.length }} {{ s.unit }}</span>
+        </button>
       </div>
     </section>
 
-    <!-- ===== 英雄卡片墙 ===== -->
-    <main class="grid">
-      <article v-for="h in filteredHeroes" :key="h.name" class="hero-card">
-        <div class="hc-avatar" :style="{ background: rankMeta[h.rank].color }">
-          <span>{{ h.rank }}</span>
-        </div>
-        <div class="hc-body">
-          <div class="hc-name">{{ h.name }}</div>
-          <div class="hc-alias">{{ h.alias }}</div>
-          <div class="hc-tag">{{ h.tag }}</div>
-        </div>
-        <div class="hc-rank" :style="{ color: rankMeta[h.rank].color }">{{ rankMeta[h.rank].label }}</div>
-      </article>
+    <!-- ===== 各板块搜索区 ===== -->
+    <section v-else class="hero-zone">
+      <h1 class="big-title">{{ current.title }}<span>{{ current.titleAccent }}</span></h1>
+      <p class="slogan">{{ current.slogan }}</p>
 
-      <!-- 空结果 -->
-      <div v-if="filteredHeroes.length === 0" class="empty">
+      <SearchPanel
+        :keyword="keyword"
+        :section="current"
+        :filters="filters"
+        :sort-key="sortKey"
+        :count="results.length"
+        :total="current.items.length"
+        @update:keyword="keyword = $event"
+        @update:filters="filters = $event"
+        @update:sort-key="sortKey = $event"
+      />
+    </section>
+
+    <!-- ===== 结果卡片墙 ===== -->
+    <main v-if="activeKey !== 'home'" class="grid">
+      <ResultCard
+        v-for="it in results"
+        :key="it.id"
+        :item="it"
+        :section="current"
+        :keyword="keyword"
+      />
+
+      <div v-if="results.length === 0" class="empty">
         <div class="empty-boom">轰！</div>
-        <p>没有找到相关英雄 —— 可能已经被琦玉一拳清场了</p>
-        <button class="chip on" @click="keyword = ''; rankFilter = 'all'">查看全部英雄</button>
+        <p>
+          没有找到「{{ keyword || '当前筛选条件' }}」相关的{{ current.unit }}
+          —— 可能已经被琦玉一拳清场了
+        </p>
+        <button class="chip on" @click="resetAll">查看全部{{ current.unit }}</button>
       </div>
     </main>
 
     <footer class="foot">
       HERO ASSOCIATION · 英雄协会总部 · 灾害等级：今日平和
+      <span v-if="activeFilterCount"> · 已启用 {{ activeFilterCount }} 项筛选</span>
     </footer>
   </div>
 </template>
@@ -180,7 +276,6 @@ function doSearch() {
   display: flex;
   flex-direction: column;
 }
-.dots { display: none; }
 
 /* ===== 导航栏 ===== */
 .navbar {
@@ -214,7 +309,7 @@ function doSearch() {
 .logo-text small { font-size: 10px; font-weight: 700; color: #d03a2c; letter-spacing: 2px; }
 
 .menu { display: flex; gap: 4px; flex: 1; }
-.menu a {
+.nav-item {
   padding: 8px 16px;
   font-size: 14px;
   font-weight: 800;
@@ -225,8 +320,8 @@ function doSearch() {
   border-radius: 4px;
   transition: all .12s;
 }
-.menu a:hover { border-color: #14100e; background: #f7c948; transform: translateY(-2px); }
-.menu a.active {
+.nav-item:hover { border-color: #14100e; background: #ffe9a3; transform: translateY(-2px); }
+.nav-item.active {
   background: #14100e;
   color: #f7c948;
   border-color: #14100e;
@@ -240,7 +335,7 @@ function doSearch() {
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   color: #fff; font-weight: 900; font-size: 16px;
-  text-shadow: 1px 1px 0 rgba(0,0,0,.35);
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, .35);
 }
 .who { display: flex; flex-direction: column; line-height: 1.15; }
 .who strong { font-size: 13px; font-weight: 800; color: #14100e; }
@@ -263,168 +358,125 @@ function doSearch() {
 /* ===== 搜索区 ===== */
 .hero-zone {
   text-align: center;
-  padding: 56px 24px 30px;
+  padding: 48px 24px 26px;
 }
 .big-title {
-  font-size: 52px;
+  font-size: 48px;
   font-weight: 900;
   color: #14100e;
-  letter-spacing: 10px;
+  letter-spacing: 8px;
   text-shadow: 4px 4px 0 rgba(208, 58, 44, .35);
 }
 .big-title span { color: #d03a2c; }
 .slogan {
-  margin: 12px 0 30px;
-  font-size: 14px;
+  margin: 10px 0 26px;
+  font-size: 13px;
   font-weight: 700;
   color: rgba(20, 16, 14, .6);
-  letter-spacing: 4px;
+  letter-spacing: 3px;
 }
 
-.search-bar {
-  display: flex;
-  max-width: 560px;
-  margin: 0 auto;
-  background: #fdf6e3;
-  border: 4px solid #14100e;
-  border-radius: 6px;
-  box-shadow: 7px 7px 0 #14100e;
-  overflow: hidden;
+/* ===== 板块入口卡片 ===== */
+.entries {
+  margin: 32px auto 0;
+  max-width: 900px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
 }
-.search-bar input {
-  flex: 1;
-  border: none;
-  outline: none;
-  background: transparent;
-  padding: 15px 18px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #14100e;
+.entry {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 22px 16px 18px;
+  background: var(--paper);
+  border: 4px solid var(--hero-dark);
+  border-radius: 10px;
+  box-shadow: 6px 6px 0 rgba(20, 16, 14, .85);
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform .12s, box-shadow .12s;
+}
+.entry:hover {
+  transform: translate(-3px, -3px);
+  box-shadow: 9px 9px 0 var(--accent);
+}
+.e-icon {
+  width: 46px; height: 46px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; font-weight: 900; color: #fff;
+  border: 3px solid var(--hero-dark);
+  border-radius: 50%;
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, .3);
+}
+.entry strong { font-size: 16px; font-weight: 900; letter-spacing: 2px; color: var(--hero-dark); }
+.entry small { font-size: 11px; font-weight: 600; color: #6b5d4f; line-height: 1.5; text-align: center; }
+.e-count {
+  margin-top: 4px;
+  padding: 3px 12px;
+  font-size: 11px; font-weight: 800; letter-spacing: 1px;
+  color: var(--hero-dark);
+  background: var(--saitama-yellow);
+  border: 2px solid var(--hero-dark);
+  border-radius: 999px;
+}
+
+/* ===== 跨板块分组结果 ===== */
+.grouped { max-width: 1080px; margin: 30px auto 0; padding: 0 28px; text-align: left; }
+.group { margin-bottom: 26px; }
+.group-head {
+  display: flex; align-items: center; gap: 10px;
+  padding-bottom: 8px; margin-bottom: 14px;
+  border-bottom: 3px solid rgba(20, 16, 14, .25);
+}
+.g-icon {
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 900; color: #fff;
+  border: 2px solid var(--hero-dark); border-radius: 50%;
+}
+.group-head strong { font-size: 15px; font-weight: 900; letter-spacing: 2px; color: var(--hero-dark); }
+.g-count { font-size: 11px; font-weight: 700; color: rgba(20, 16, 14, .5); }
+.g-more {
+  margin-left: auto;
+  padding: 4px 12px;
+  font-size: 11px; font-weight: 800; letter-spacing: 1px;
+  color: var(--cape-red);
+  background: #fff;
+  border: 2px solid var(--cape-red);
+  border-radius: 4px;
+  cursor: pointer;
   font-family: inherit;
 }
-.search-bar input::placeholder { color: rgba(20, 16, 14, .38); }
-.btn-search {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 24px;
-  font-size: 15px;
-  font-weight: 900;
-  letter-spacing: 3px;
-  color: #fff;
-  background: #d03a2c;
-  border: none;
-  border-left: 4px solid #14100e;
-  cursor: pointer;
-  transition: background .12s;
-}
-.btn-search:hover { background: #b52c20; }
-.btn-search:active { transform: translateX(2px); }
+.g-more:hover { background: var(--cape-red); color: #fff; }
+.no-hit { text-align: center; font-size: 13px; font-weight: 700; color: #6b5d4f; padding: 30px 0; }
 
-.chips {
-  margin-top: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.chip {
-  padding: 6px 16px;
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 2px;
-  color: #14100e;
-  background: #fdf6e3;
-  border: 3px solid #14100e;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: all .12s;
-}
-.chip:hover { transform: translateY(-2px); box-shadow: 3px 3px 0 #14100e; }
-.chip.on { background: #14100e; color: #f7c948; }
-.count {
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(20, 16, 14, .55);
-  letter-spacing: 1px;
-  margin-left: 8px;
-}
-
-/* ===== 英雄卡片墙 ===== */
+/* ===== 卡片墙 ===== */
 .grid {
-  flex: 1;
   max-width: 1080px;
   width: 100%;
   margin: 0 auto;
   padding: 20px 28px 50px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 18px;
-}
-.hero-card {
-  position: relative;
-  display: flex;
-  gap: 14px;
-  padding: 16px;
-  background: #fdf6e3;
-  border: 4px solid #14100e;
-  border-radius: 8px;
-  box-shadow: 6px 6px 0 rgba(20, 16, 14, .85);
-  transition: transform .12s, box-shadow .12s;
-  cursor: pointer;
-}
-.hero-card:hover {
-  transform: translate(-3px, -3px);
-  box-shadow: 9px 9px 0 rgba(20, 16, 14, .85);
-}
-.hero-card:active {
-  transform: translate(2px, 2px);
-  box-shadow: 3px 3px 0 rgba(20, 16, 14, .85);
-}
-.hc-avatar {
-  flex-shrink: 0;
-  width: 56px;
-  height: 56px;
-  border: 3px solid #14100e;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.hc-avatar span {
-  font-size: 26px;
-  font-weight: 900;
-  color: #fff;
-  text-shadow: 2px 2px 0 rgba(0, 0, 0, .35);
-}
-.hc-body { flex: 1; min-width: 0; }
-.hc-name { font-size: 17px; font-weight: 900; color: #14100e; letter-spacing: 1px; }
-.hc-alias { font-size: 11px; font-weight: 700; color: #d03a2c; letter-spacing: 1px; margin: 2px 0 6px; }
-.hc-tag { font-size: 12px; font-weight: 600; color: #6b5d4f; line-height: 1.6; }
-.hc-rank {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 1px;
 }
 
 /* 空结果 */
 .empty {
   grid-column: 1 / -1;
   text-align: center;
-  padding: 60px 20px;
-  background: #fdf6e3;
-  border: 4px dashed #14100e;
+  padding: 56px 20px;
+  background: var(--paper);
+  border: 4px dashed var(--hero-dark);
   border-radius: 10px;
 }
 .empty-boom {
-  font-size: 60px;
+  font-size: 56px;
   font-weight: 900;
-  color: #d03a2c;
-  -webkit-text-stroke: 2px #14100e;
+  color: var(--cape-red);
+  -webkit-text-stroke: 2px var(--hero-dark);
   transform: rotate(-6deg);
   margin-bottom: 14px;
 }
@@ -435,6 +487,21 @@ function doSearch() {
   letter-spacing: 2px;
   margin-bottom: 20px;
 }
+.chip {
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--hero-dark);
+  background: var(--paper);
+  border: 3px solid var(--hero-dark);
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .12s;
+}
+.chip.on { background: var(--hero-dark); color: var(--saitama-yellow); }
+.chip:hover { transform: translateY(-2px); box-shadow: 3px 3px 0 var(--hero-dark); }
 
 /* 页脚 */
 .foot {
@@ -450,6 +517,6 @@ function doSearch() {
 @media (max-width: 760px) {
   .menu { display: none; }
   .who { display: none; }
-  .big-title { font-size: 36px; }
+  .big-title { font-size: 32px; letter-spacing: 4px; }
 }
 </style>
