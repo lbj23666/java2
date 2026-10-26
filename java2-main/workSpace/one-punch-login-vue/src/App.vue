@@ -6,6 +6,7 @@ import RegisterCard from './components/RegisterCard.vue'
 import HomePage from './components/HomePage.vue'
 import LoadingOverlay from './components/LoadingOverlay.vue'
 import { login, register } from './api'
+import { loadCatalog } from './data/catalog'
 
 // 全局状态：协调琦玉动画与登录/注册/加载/主页
 const view = ref('login')    // 当前视图：login | register | loading | home
@@ -17,6 +18,8 @@ const message = ref(null)    // 表单提示 { text, type }
 const user = ref(null)       // 登录后的英雄信息 { id, username, email, heroClass }
 
 let tipTimer = null
+// 首页四大板块数据的加载 Promise（数据来源：后端 GET /api/catalog）
+let catalogTask = null
 
 function onFocusChange(focused) {
   serious.value = focused
@@ -66,6 +69,11 @@ async function onLogin({ username, password, linkTip }) {
         // 登录成功 → 先播放"接入英雄协会系统"加载动画，再进入首页
         user.value = res.data
         message.value = null
+        // 趁加载动画这段时间把板块数据拉下来，动画结束即可直接渲染
+        catalogTask = loadCatalog().catch((e) => {
+          console.error('[catalog] 板块数据加载失败：', e)
+          return -1
+        })
         setTimeout(() => { view.value = 'loading' }, 350)
       } else {
         showTip(res.message || '登录失败', 'err')
@@ -114,7 +122,15 @@ async function onRegister({ codename, email, password, confirmPwd, heroClass }) 
 }
 
 // ===== 加载动画完成 → 进入首页 =====
-function onLoadingDone() {
+// 等板块数据到位再进首页（已 catch 过，不会 reject），失败则给提示后照常进入
+async function onLoadingDone() {
+  if (catalogTask) {
+    const total = await catalogTask
+    if (total === -1) {
+      showTip('板块数据拉取失败，可检查后端 8080 是否正常', 'err')
+    }
+    catalogTask = null
+  }
   view.value = 'home'
 }
 

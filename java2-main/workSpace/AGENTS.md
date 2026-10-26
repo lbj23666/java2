@@ -91,3 +91,29 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:5173   # 前端
 - npm optional deps bug 复现且加重：即使删 lock+node_modules 全新重装，`@rolldown/binding-win32-x64-msvc` 仍不会被装上（lock 里有记录、平台 win32/x64 匹配、npm 却报 up to date）。AI 会话内可靠修复法：`npm pack @rolldown/binding-win32-x64-msvc@1.2.14` 后 tar 解压到 node_modules/@rolldown/binding-win32-x64-msvc --strip-components=1（已验证 vite 8.3.4 正常启动）。start.bat 的删 lock 重装自愈逻辑对用户双击场景仍有效，可保留
 - 本次 AI 启动全链路验证通过（后端 8080 / 前端 5173 / 登录接口返回 code 200）
 - 2026-10-16 前端改版：登录成功 → LoadingOverlay.vue（充能动画）→ HomePage.vue（整页首页：导航栏+搜索栏+英雄卡片墙，亮黄漫画风）。view 状态：login|register|loading|home。旧 HomeCard.vue 已弃用未删
+
+## 2026-10-26 首页四个文件丢失 + 重建（重要！）
+
+- **现象**：后端正常启动、Vite 也起来，但页面白屏。根因：`HomePage.vue` 依赖的 4 个文件根本不存在
+  （git 历史、`_old_backup`、全盘搜索都没有，应该是改版到一半未保存就丢了）：
+
+  | 缺失文件 | 作用 | 重建依据 |
+  |---|---|---|
+  | `src/data/catalog.js` | 导出 `catalog` / `LEVEL_ORDER` / `itemSearchText` | HomePage 用到 `section.key/label/icon/accent/unit/slogan/title/titleAccent/placeholder/hotwords/filters/sorts/items` |
+  | `src/utils/search.js` | 导出 `matches(text, keyword)` | `searchIn()` 里 `matches(itemSearchText(it, section), kw)` |
+  | `src/components/SearchPanel.vue` | 搜索框/热词/筛选/排序 | props: `keyword, section, filters, sortKey, count, total`；emits: `update:keyword, update:filters, update:sortKey` |
+  | `src/components/ResultCard.vue` | 结果卡片（关键词高亮） | props: `item, section, keyword` |
+
+- **重建约定**（改动这几个文件时务必遵守）：
+  - section.filters 是数组 `{ key, label, options:[{value,label}] }`，命中规则 `it[g.key] === selected`，`'all'` 表示不限
+  - section.sorts 是数组 `{ k, label }`；`k` 的语义在 HomePage 的 `comparator()` 里硬编码：`name`→字典序、`time`→按 ts 倒序、`power`/`bounty`→按 weight 倒序，其他→按 LEVEL_ORDER[level] 倒序再按 weight 倒序
+  - 每条 item 通用字段：`id / name / level / weight / ts`，各板块另有专属字段（heroes: affiliation/ability；monsters: habitat/status/feature；disasters: location/status/detail；notices: dept/content）
+  - 首页的 `homeSection` 没有 `unit` 字段，SearchPanel 里已做 `section.unit || '条结果'` 兜底
+  - **`matches()` 必须忽略文本内部空白**：先把 haystack 里所有空白去掉再匹配。等级标签写成「S 级」（带空格）时，用户搜「S级」否则永远匹配不上——这个坑实际踩到过
+  - **每个筛选选项至少要有一条对应数据**，否则用户点了筛选项是空列表。用下面的一行脚本自检（放在项目根目录跑完记得删）：
+    `node -e "..."` 对 `catalog` 每个 `filters` 的每个 `option` 做 `items.filter(it => it[g.key] === o.value)`，长度为 0 就补数据
+  - 同理，hotwords 里每个热词都必须能搜出结果。首页 `homeSection` 的热词是 `['琦玉','龙级','在逃','紧急','A市']`，
+    所以「琦玉/埼玉」必须能命中某条英雄数据（已给「秃头披风侠」加 `alias: '埼玉 琦玉'`），否则点了是空页
+
+- **本次复用的坑验证**：第 12/13/18 条全部复现且解法有效。注意第 13 条的 `java -classpath` 里的 jar 路径**必须写成 Windows 反斜杠**（`C:\\Users\\...`），用正斜杠（`C:/Users/...`）即使加了 `MSYS_NO_PATHCONV=1` 也会 ClassNotFoundException；其余 `-D` 参数用正斜杠没问题
+- 最终验证：8080/5173 均 LISTENING，登录接口直连和走代理都返回 `{"code":200,...}`，5 个前端模块全部 200 且无 Failed to resolve

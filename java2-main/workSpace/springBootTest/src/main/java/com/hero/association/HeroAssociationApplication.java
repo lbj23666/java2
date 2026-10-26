@@ -17,6 +17,8 @@ public class HeroAssociationApplication {
         System.out.println("  英雄协会后端已启动: http://localhost:8080");
         System.out.println("  登录接口: POST /api/login");
         System.out.println("  注册接口: POST /api/register");
+        System.out.println("  板块数据: GET  /api/catalog");
+        System.out.println("  分板块查: GET  /api/heroes /api/monsters /api/disasters /api/notices");
         System.out.println("============================================\n");
     }
 }
