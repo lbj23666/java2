@@ -117,3 +117,61 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:5173   # 前端
 
 - **本次复用的坑验证**：第 12/13/18 条全部复现且解法有效。注意第 13 条的 `java -classpath` 里的 jar 路径**必须写成 Windows 反斜杠**（`C:\\Users\\...`），用正斜杠（`C:/Users/...`）即使加了 `MSYS_NO_PATHCONV=1` 也会 ClassNotFoundException；其余 `-D` 参数用正斜杠没问题
 - 最终验证：8080/5173 均 LISTENING，登录接口直连和走代理都返回 `{"code":200,...}`，5 个前端模块全部 200 且无 Failed to resolve
+
+## 2026-10-28 装依赖 + 首页文件二次重建（含后端接口补建）
+
+- 本次工作副本路径：`D:\workSpace\java2\java2-main\workSpace`（不是 Desktop 那份，注意别改错目录）
+- **四个文件又丢了**（同一份副本重建第 2 次）：`src/data/catalog.js`、`src/utils/search.js`、
+  `src/components/SearchPanel.vue`、`src/components/ResultCard.vue`。已按第 95 条约定重建并跑通构建
+- **后端 `/api/catalog` 此前根本不存在**（只有 UserController），但启动日志和 `src/api/index.js` 都声明了它，
+  导致 `loadCatalog()` 必然失败。已新建 `controller/CatalogController.java`：
+  `GET /api/catalog` 返回 `{heroes,monsters,disasters,notices}` 四个数组（共 18/20/12/12 条），
+  并顺带实现了 `/api/heroes`、`/api/monsters`、`/api/disasters`、`/api/notices`（支持字段等值过滤 + sort/page/size）
+- **数据在前后端各存了一份**（前端 `catalog.js` 内置兜底，后端 Controller 静态数据），改数据时要两边同步
+- Maven 实际可用路径（比第 30 条更精确，wrapper 里多套一层 `apache-maven-3.9.16`）：
+  `%USERPROFILE%\.m2\wrapper\dists\apache-maven-3.9.16-bin\5grr65jo27hi51sujmtcldfovl\apache-maven-3.9.16\bin\mvn.cmd`
+  在 Git Bash 里直接调 `mvn.cmd` 可用（第 13 条的 classworlds 绕法这次没用上）
+- 自检数据是否"点得动"的临时脚本套路：把 `catalog.js` / `search.js` 读进来、正则删掉开头的 `import` 行、
+  写到临时 `.mjs` 再动态 `import`，即可用 node 直接跑（Vite 能解析无扩展名 import，node 不能）。
+  检查项：每个筛选 option 至少 1 条数据、每个 hotword 至少 1 条命中、首页 5 个热词全命中。**跑完记得删脚本**
+- 本次验证：`npm run build` 30 模块通过；8080 与 5173 均 200，`/api/catalog` 直连与走 Vite 代理都返回 code 200
+
+## 2026-10-28（2）新增后台管理系统
+
+- 入口：首页导航栏右侧「后台管理」按钮 → `AdminLogin.vue`（**只有登录，没有注册**）→ `AdminPanel.vue`
+- 视图状态机（App.vue）扩充为：`login | register | loading | home | adminLogin | admin`
+- **后台登录复用前台的 `POST /api/login`**（同一套英雄账号，如 秃头披风侠 / 123456），没有单独的 admin 表或接口
+- 管理范围：首页四大板块的数据增删改，落在**早已存在但一直没被用到的四张表**
+  （`t_hero` / `t_monster` / `t_disaster` / `t_notice`，表结构在 `hero_association.sql` 第 5 节）
+- 新增文件：
+  - 后端 `entity/Hero|Monster|Disaster|Notice.java`、`mapper/*Mapper.java`（MyBatis-Plus BaseMapper）
+  - 后端 `service/CatalogService.java` + `impl/CatalogServiceImpl.java`（读四表 + 增删改，id 形如 h-01/m-01/d-01/n-01，新增自动生成）
+  - 后端 `controller/AdminController.java`：`GET /api/admin/list?section=`、`POST /api/admin/save`、`DELETE /api/admin/delete?section=&id=`
+  - 前端 `components/AdminLogin.vue`、`components/AdminPanel.vue`
+- **数据源已切到数据库**：`CatalogController` 现在从四张表读；只有当查询结果全为空或抛异常时，
+  才回退到控制器里那份静态兜底数据。所以改了库里的数据，首页会跟着变
+- 数据初始化：`springBootTest/sql/catalog_data.sql`（由前端 catalog.js 生成，共 62 条：18/20/12/12）。
+  **该脚本会先 `DELETE` 四张表再灌数**，只在需要重置初始数据时手动执行，别挂到 start-all.bat 上，
+  否则用户在后台做的修改会被清空
+- 从后台返回首页时 App.vue 会重新 `loadCatalog()`，保证首页看到的是最新数据
+- 本次验证：新增 h-19 → 修改 → 删除 闭环通过，条数回到 18；四个板块 admin/list 分别为 18/20/12/12；
+  `/api/login` 返回 code 200；前端 build 34 模块通过，两个新页面模块 200 且无解析错误
+- **后台接口要走 Vite 代理实测**（不能只测 8080 直连）：`http://localhost:5173/api/admin/list?section=xxx`
+  与 POST `/api/admin/save`、DELETE `/api/admin/delete?section=&id=` 均验证通过（代理转发 /api 前缀即可，无需额外配置）
+
+## 2026-10-28 形象系统（头像 / 插画）
+- **每个条目都有形象**：优先用 AI 插画，没插画的按角色名程序化生成半身剪影；灾害 / 公告用符号图标。
+  组件是 `src/components/AvatarBadge.vue`，被 `ResultCard.vue`（首页卡片）和 `AdminPanel.vue`（后台表格）共用
+- **插画资源**：16 张（6 位 S 级英雄 + 10 只龙级怪人）放在 `src/assets/avatars/`，命名 `hero-xxx.png` / `monster-xxx.png`
+  （320x320，用 Pillow 从 1024x1024 压缩，总体积约 2.9MB）。**图右下角有「AI生成」水印，是平台合规要求，去不掉**
+- **加载方式必须用 `import.meta.glob(..., { eager: true, query: '?url', import: 'default' })`** 静态收集。
+  Vite 不会收录运行时拼字符串的动态路径，直接 `import` 变量会打包不到图
+- **avatar 字段是可选的**：数据里 `avatar: 'hero-saitama'` 这类 key 对应资源名；不填则程序化生成。
+  数据库 `t_hero` / `t_monster` 已加 `avatar varchar(64)` 列（灾害 / 公告表没加，因为它们不是角色）
+- **角色数据扩展**：英雄 18→30、怪人 20→30（S9/A8/B7/C6，龙12/鬼7/虎5/狼6），每个筛选项和热词都有数据。
+  自检脚本见 `probe_check.mjs` 思路：热词要用 `itemSearchText` 拼接后的文本判定（「S级」「战力」是拼出来的，不在原始字段里）
+- **后台可管理形象**：`AdminPanel.vue` 的英雄 / 怪人表单多了「形象」下拉（空 = 自动生成），表格有形象列。
+  **坑：后台编辑角色必须带 avatar，否则后端会把字段清空**（现在表单已带）
+- 数据初始化脚本已更新：`gen_catalog_sql.mjs` 会带上 avatar 列；`catalog_data.sql` 现在共 84 条（30/30/12/12，形象 6/10）
+- **重启后端注意**：本会话后台启动的进程可能被回收导致端口被旧代码占用，表现为接口返回的数据没有新字段。
+  处理：`netstat -ano | grep :8080` 找 PID → `taskkill` 不行就用 `Stop-Process -Id <pid> -Force` → 重新 `mvn spring-boot:run`

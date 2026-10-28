@@ -5,17 +5,20 @@ import LoginCard from './components/LoginCard.vue'
 import RegisterCard from './components/RegisterCard.vue'
 import HomePage from './components/HomePage.vue'
 import LoadingOverlay from './components/LoadingOverlay.vue'
+import AdminLogin from './components/AdminLogin.vue'
+import AdminPanel from './components/AdminPanel.vue'
 import { login, register } from './api'
 import { loadCatalog } from './data/catalog'
 
 // 全局状态：协调琦玉动画与登录/注册/加载/主页
-const view = ref('login')    // 当前视图：login | register | loading | home
+const view = ref('login')    // 当前视图：login | register | loading | home | adminLogin | admin
 const serious = ref(false)   // 认真脸
 const punching = ref(false)  // 出拳动画
 const hitting = ref(false)   // 按钮闪光
 const showImpact = ref(false) // "轰！！"冲击波
 const message = ref(null)    // 表单提示 { text, type }
 const user = ref(null)       // 登录后的英雄信息 { id, username, email, heroClass }
+const adminUser = ref(null)  // 后台登录的管理员信息（与前台账号体系相同，单独记录）
 
 let tipTimer = null
 // 首页四大板块数据的加载 Promise（数据来源：后端 GET /api/catalog）
@@ -134,6 +137,27 @@ async function onLoadingDone() {
   view.value = 'home'
 }
 
+// ===== 后台管理 =====
+function onAdminLogin(info) {
+  adminUser.value = info
+  view.value = 'admin'
+}
+
+// 从后台返回首页：后台可能增删改过数据，先重新拉一次板块数据再渲染
+async function onAdminBack() {
+  try {
+    await loadCatalog()
+  } catch (e) {
+    console.error('[catalog] 返回首页时刷新板块数据失败：', e)
+  }
+  view.value = 'home'
+}
+
+function onAdminLogout() {
+  adminUser.value = null
+  view.value = 'login'
+}
+
 // ===== 首页 =====
 function onLogout() {
   user.value = null
@@ -156,14 +180,30 @@ function showTip(text, type) {
   <div class="halftone"></div>
   <div class="impact-text" :class="{ show: showImpact }">轰！！</div>
 
+  <!-- 后台管理系统：登录页（只有登录，没有注册） -->
+  <AdminLogin
+    v-if="view === 'adminLogin'"
+    @success="onAdminLogin"
+    @back="switchView('home')"
+  />
+
+  <!-- 后台管理系统：四大板块数据维护 -->
+  <AdminPanel
+    v-else-if="view === 'admin'"
+    :hero="adminUser"
+    @back="onAdminBack"
+    @logout="onAdminLogout"
+  />
+
   <!-- 登录成功后的加载过渡动画 -->
-  <LoadingOverlay v-if="view === 'loading'" @done="onLoadingDone" />
+  <LoadingOverlay v-else-if="view === 'loading'" @done="onLoadingDone" />
 
   <!-- 登录后的英雄协会首页（整页） -->
   <HomePage
     v-else-if="view === 'home'"
     :hero="user"
     @logout="onLogout"
+    @admin="switchView('adminLogin')"
   />
 
   <div v-else class="stage">

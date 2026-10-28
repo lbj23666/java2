@@ -21,6 +21,14 @@ async function get(url) {
   return resp.json()
 }
 
+async function del(url) {
+  const resp = await fetch(url, { method: 'DELETE' })
+  if (!resp.ok) {
+    throw new Error(`网络异常（HTTP ${resp.status}），请确认后端已启动`)
+  }
+  return resp.json()
+}
+
 /**
  * 登录
  * @param {{ username: string, password: string }} payload
@@ -50,6 +58,29 @@ export function fetchCatalog() {
  * @param {'heroes'|'monsters'|'disasters'|'notices'} section
  * @param {Record<string, string|number>} params 如 { level: 'S', sort: 'power', page: 1, size: 5 }
  */
+/**
+ * 后台管理：查询某板块全部记录
+ * @param {'heroes'|'monsters'|'disasters'|'notices'} section
+ */
+export function fetchAdminList(section) {
+  return get(`/api/admin/list?section=${encodeURIComponent(section)}`)
+}
+
+/**
+ * 后台管理：新增或更新一条记录（payload 带 id 为更新）
+ * @param {Record<string, any>} payload 形如 { section: 'heroes', name: '...', level: 'S' }
+ */
+export function saveAdminItem(payload) {
+  return request('/api/admin/save', payload)
+}
+
+/**
+ * 后台管理：删除一条记录
+ */
+export function deleteAdminItem(section, id) {
+  return del(`/api/admin/delete?section=${encodeURIComponent(section)}&id=${encodeURIComponent(id)}`)
+}
+
 export function fetchSection(section, params = {}) {
   const qs = Object.keys(params)
     .filter((k) => params[k] !== undefined && params[k] !== null && params[k] !== '')

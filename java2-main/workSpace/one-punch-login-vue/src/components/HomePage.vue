@@ -17,7 +17,7 @@ import { matches } from '../utils/search'
 const props = defineProps({
   hero: { type: Object, required: true }
 })
-const emit = defineEmits(['logout'])
+const emit = defineEmits(['logout', 'admin'])
 
 const sections = catalog
 
@@ -147,6 +147,8 @@ const userRankColor = computed(() => {
           @click.prevent="selectSection(s.key)"
         >{{ s.label }}</a>
       </nav>
+
+      <button class="btn-admin" @click="emit('admin')">后台管理</button>
 
       <div class="user-chip">
         <span class="avatar" :style="{ background: userRankColor }">{{ hero.heroClass }}</span>
@@ -327,6 +329,24 @@ const userRankColor = computed(() => {
   border-color: #14100e;
   box-shadow: 3px 3px 0 rgba(20, 16, 14, .3);
 }
+
+/* 后台管理入口 */
+.btn-admin {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 7px 16px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #fdf6e3;
+  background: #14100e;
+  border: 3px solid #14100e;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all .12s;
+}
+.btn-admin:hover { background: var(--cape-red); border-color: var(--cape-red); transform: translateY(-2px); }
 
 .user-chip { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .avatar {
