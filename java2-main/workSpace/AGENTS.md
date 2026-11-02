@@ -175,3 +175,58 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:5173   # 前端
 - 数据初始化脚本已更新：`gen_catalog_sql.mjs` 会带上 avatar 列；`catalog_data.sql` 现在共 84 条（30/30/12/12，形象 6/10）
 - **重启后端注意**：本会话后台启动的进程可能被回收导致端口被旧代码占用，表现为接口返回的数据没有新字段。
   处理：`netstat -ano | grep :8080` 找 PID → `taskkill` 不行就用 `Stop-Process -Id <pid> -Force` → 重新 `mvn spring-boot:run`
+
+## 2026-11-02 D盘副本整体回退 + 第三次重建（第三次丢文件！）
+
+- **现象**：`D:/workSpace/java2/java2-main/workSpace` 被整体回退到很早的版本——10-28 做的
+  后台管理系统（前后端）、形象系统、`catalog_data.sql`、16 张 AI 插画**全部丢失**；
+  桌面备份已被系统重置清空，`_old_backup` 是空目录，无法恢复。数据库也回到 40 条
+  初始状态（12/12/8/8，且没有 avatar 列）。
+- **已全部重建**：
+  - 后端：`entity/Hero|Monster|Disaster|Notice`、四个 Mapper、`CatalogService(+Impl)`、
+    `CatalogController`（/api/catalog + /api/{section} 泛型路由）、`AdminController`、
+    `MybatisPlusConfig`（分页拦截器，selectPage 必需）
+  - 前端：`src/data/catalog.js`、`src/utils/search.js`、`SearchPanel.vue`、
+    `ResultCard.vue`、`AvatarBadge.vue`、`AdminLogin.vue`、`AdminPanel.vue`
+  - 数据：84 条（英雄30 S9/A8/B7/C6，怪人30 龙12/鬼7/虎5/狼6，灾害12，公告12），
+    每个筛选项/热词均通过自检脚本验证有点可点
+- **avatar 插画没有恢复**：16 张 AI 图彻底丢了。AvatarBadge 走程序化剪影兜底，
+  DB 的 avatar 列保留（当前全空），`hero_association.sql` 两张 CREATE TABLE 已补 avatar 列，
+  后台表单的形象字段是文本框（留空=自动生成剪影），以后重新生成插画填 key 即可
+- **数据同步工具**：`one-punch-login-vue/gen_catalog_data.mjs`（node 运行）从
+  `src/data/catalog.js` 生成 `springBootTest/sql/catalog_data.sql`，改数据先改 catalog.js
+  再跑它。**catalog_data.sql 导入时必须带库名**：`mysql -uroot -p123456 --default-character-set=utf8mb4 hero_association < catalog_data.sql`（不带库名报 No database selected）
+- **后端注意**：save() 新增时先反射 setId（h-31 风格自增编号）再 insert；
+  updateById 忽略 null 字段，所以编辑不带 avatar **不会**清空库里的值（第 174 行的老坑已消除）
+- **npm optional deps bug 第三次复现**：`@rolldown/binding-win32-x64-msvc` 装不上，
+  修复法有效：`npm pack @rolldown/binding-win32-x64-msvc@1.2.14` → tar 解压到
+  `node_modules/@rolldown/binding-win32-x64-msvc --strip-components=1`
+- 本次验证：后端 8080 + 前端 5173 均 200；登录（直连+代理）、/api/catalog（30/30/12/12）、
+  /api/heroes 筛选/排序/分页、后台 CRUD（新增 h-31→删除→还原 30）全通过；build 36 模块通过
+
+## 2026-11-02（2）形象插画重新生成完成
+
+- 16 张插画已用图像生成重制（约 80~160 积分）：6 位 S 级英雄 + 10 只龙级怪人，
+  1024 生成 → Pillow 压缩 320×320 → `src/assets/avatars/`，命名 hero-xxx.png / monster-xxx.png，
+  总体积约 3.56MB，图右下角带平台合规「AI生成」水印（去不掉）
+- 已写回 `catalog.js` avatar 字段并同步入库（重跑 `gen_catalog_data.mjs` + 导入 SQL）
+- key 对照：h-02~h-07 → hero-jenos/tatsumaki/bang/atomic/flash/mask；
+  m-01~m-08、m-10、m-11 → monster-boros/beetle/centipede/melzagard/gouketsu/seaking/denki/shade/magma/kannon
+- 验证：/api/catalog 返回 avatar、Vite 直取 PNG 200、build 打包 16 张 PNG 全通过
+
+## 2026-11-02（3）第二批 51 张插画 + 灾害/公告接回（全部角色 AI 化完成）
+
+- 又生成 51 张（24 英雄 + 20 怪人专属 + 灾害狼/虎/鬼/龙 4 张 + 公告普通/重要/紧急 3 张），
+  1024 生成 → Pillow 320×320 → avatars/；现在**全部 84 条记录都带 AI 插画**（hero-*/monster-* 按角色，
+  dis-*/note-* 按等级类别复用）。生成中途报过 429 额度，但 51 张已全部落盘 raw2，压缩后删除 raw2
+- 踩坑与修复（重要，下次别再踩）：
+  1. **catalog.js 注入正则 bug**：原正则需要行尾 `},`，但每个 section 最后一条行尾是 `}`（无逗号），
+     导致 h-30/m-30/d-12/n-12 漏写 → 改成 `(\},?)` 同时匹配两种
+  2. **生成脚本漏列**：`gen_catalog_data.mjs` 的 tableMap 里 disasters/notices 没列 avatar，
+     已补；并同步 `hero_association.sql` 基础建表的 t_disaster/t_notice avatar 列
+  3. **后端实体漏字段**：Disaster.java / Notice.java 当初只给 Hero/Monster 加了 avatar，
+     导致 DB 有值但 /api/catalog 返回 null → 给两个实体补 `private String avatar`，重启后端生效
+  4. **AvatarBadge 优先级正确**：模板顺序 v-if avatarUrl → v-else-if isGlyphSection，所以
+     灾害/公告有图时显示图、无图才降级符号；不用改组件
+- 验证：/api/catalog 四板块 30/30、30/30、12/12、12/12 全带形象；Vite 直取 hero/mouse/dis/note 全部 200；
+  npm run build 67 张 PNG 全打包

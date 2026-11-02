@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS t_hero (
     ability      VARCHAR(128) DEFAULT NULL            COMMENT '能力/招式',
     `weight`     INT          NOT NULL DEFAULT 0      COMMENT '战力权重，用于排序',
     `ts`         BIGINT       NOT NULL DEFAULT 0      COMMENT '排序用时间权重',
+    avatar       VARCHAR(64)  DEFAULT NULL            COMMENT '形象插画key（可选）',
     PRIMARY KEY (id),
     KEY idx_hero_level (`level`),
     KEY idx_hero_affiliation (affiliation)
@@ -74,6 +75,7 @@ CREATE TABLE IF NOT EXISTS t_monster (
     feature      VARCHAR(128) DEFAULT NULL            COMMENT '特征描述',
     `weight`     INT          NOT NULL DEFAULT 0      COMMENT '威胁权重，用于排序',
     `ts`         BIGINT       NOT NULL DEFAULT 0      COMMENT '排序用时间权重',
+    avatar       VARCHAR(64)  DEFAULT NULL            COMMENT '形象插画key（可选）',
     PRIMARY KEY (id),
     KEY idx_monster_level (`level`),
     KEY idx_monster_status (`status`),
@@ -92,6 +94,7 @@ CREATE TABLE IF NOT EXISTS t_disaster (
     detail       VARCHAR(255) DEFAULT NULL            COMMENT '详情描述',
     `weight`     INT          NOT NULL DEFAULT 0      COMMENT '危害权重，用于排序',
     `ts`         BIGINT       NOT NULL DEFAULT 0      COMMENT '排序用时间权重',
+    avatar       VARCHAR(64)  DEFAULT NULL            COMMENT '形象插画key（可选）',
     PRIMARY KEY (id),
     KEY idx_disaster_level (`level`),
     KEY idx_disaster_status (`status`)
@@ -108,6 +111,7 @@ CREATE TABLE IF NOT EXISTS t_notice (
     content      VARCHAR(255) DEFAULT NULL            COMMENT '公告正文',
     `weight`     INT          NOT NULL DEFAULT 0      COMMENT '权重，用于排序',
     `ts`         BIGINT       NOT NULL DEFAULT 0      COMMENT '排序用时间权重',
+    avatar       VARCHAR(64)  DEFAULT NULL            COMMENT '形象插画key（可选）',
     PRIMARY KEY (id),
     KEY idx_notice_level (`level`),
     KEY idx_notice_dept (dept)
