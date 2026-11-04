@@ -230,3 +230,17 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:5173   # 前端
      灾害/公告有图时显示图、无图才降级符号；不用改组件
 - 验证：/api/catalog 四板块 30/30、30/30、12/12、12/12 全带形象；Vite 直取 hero/mouse/dis/note 全部 200；
   npm run build 67 张 PNG 全打包
+
+## 2026-11-04 第四次丢文件 + 第四次重建（D盘副本再次回退）
+
+- **现象**：`D:/workSpace/java2/java2-main/workSpace` 又回退到 10-28 之前的状态：后端只剩 `UserController`（无 Catalog/Admin 控制器、无四表 Mapper、无 CatalogService、无 MybatisPlusConfig），前端 `src/data/`、`src/utils/`、SearchPanel/ResultCard/AvatarBadge/AdminLogin/AdminPanel 全没了，`sql/catalog_data.sql`、`gen_catalog_data.mjs`、67 张插画也丢了；数据库回到 12/12/8/8。
+- **已全部重建**（本次实现方式与 11-02 略有差异，看下一条）：
+  - 后端：`mapper/Hero|Monster|Disaster|NoticeMapper`、`service/CatalogService(+Impl)`、`controller/CatalogController`、`controller/AdminController`、`config/MybatisPlusConfig`
+  - 前端：`src/data/catalog.js`（84 条：30/30/12/12，含 loadCatalog 覆盖逻辑）、`src/utils/search.js`、`SearchPanel.vue`、`ResultCard.vue`、`AvatarBadge.vue`、`AdminLogin.vue`、`AdminPanel.vue`
+  - 数据：`one-punch-login-vue/gen_catalog_data.mjs` 从 catalog.js 生成 `springBootTest/sql/catalog_data.sql`，导入后 30/30/12/12
+- **两处实现调整（下次别当成 bug）**：
+  1. `CatalogServiceImpl` 用「内存过滤 + 内存排序 + 内存分页」，等级排序靠 `LEVEL_ORDER` 常量（S>A>B>C、神>龙>鬼>虎>狼、紧急>重要>普通），不走 SQL 的 FIELD()
+  2. `CatalogController` 不再内置 84 条静态兜底数据：库空或抛异常时返回空 map / 空数组，前端 `loadCatalog()` 只在数组非空时才覆盖，因此页面自然回落到 `catalog.js` 内置数据
+- **插画仍然是零**：`src/assets/avatars/` 为空，AvatarBadge 全部走程序化剪影（首字 + 稳定哈希配色）。重新生成插画后填 `avatar` key 即可自动生效
+- 本次验证：`/api/catalog` 30/30/12/12、登录 code 200、后台 list/save(h-31 自增)/delete 闭环、9 个前端模块全 200、`vite build` 36 模块通过、数据自检（筛选项/热词/首页 5 热词）全绿
+- **本次启动方式**（AI 会话内）：后端 `mvn spring-boot:run -Dspring-boot.run.arguments=--server.port=8080`；前端 `node node_modules/vite/bin/vite.js --host`（用户双击 start.bat 仍是标准路径）
