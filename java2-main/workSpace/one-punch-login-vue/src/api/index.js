@@ -88,3 +88,55 @@ export function fetchSection(section, params = {}) {
     .join('&')
   return get(`/api/${section}${qs ? '?' + qs : ''}`)
 }
+
+/**
+ * 任务中心总览：英雄经验档案 + 任务列表（含完成状态）+ 最近完成记录
+ * @param {number|string} userId
+ */
+export function fetchTasks(userId) {
+  return get(`/api/tasks?userId=${encodeURIComponent(userId)}`)
+}
+
+/**
+ * 完成一个任务
+ * @param {number|string} userId
+ * @param {string} taskId 形如 t-01
+ * @returns {Promise<{code:number,message:string,data:{expGained:number,leveledUp:boolean,levelBefore:number,levelAfter:number,profile:object}}>}
+ */
+export function completeTask(userId, taskId) {
+  return request('/api/tasks/complete', { userId, taskId })
+}
+
+// ============================================================
+// 任务 2.0：任务板 + 互动流程
+// ============================================================
+
+/** 任务板：委托列表（可接取 / 进行中）+ 已完成 + 英雄档案 */
+export function fetchMissionBoard(userId) {
+  return get('/api/mission/board?userId=' + encodeURIComponent(userId))
+}
+
+/** 刷新任务板，抽出一批新任务 */
+export function refreshMissions(userId) {
+  return request('/api/mission/refresh', { userId })
+}
+
+/** 接取委托，返回开场剧情与全部回合（不含答案分数） */
+export function startMission(userId, offerId) {
+  return request('/api/mission/start', { userId, offerId })
+}
+
+/** 提交一个回合的选择，返回这一行动的反馈 */
+export function answerMission(userId, offerId, seq, choice) {
+  return request('/api/mission/answer', { userId, offerId, seq, choice })
+}
+
+/** 结算委托：按评分发经验，可能升级 */
+export function settleMission(userId, offerId) {
+  return request('/api/mission/settle', { userId, offerId })
+}
+
+/** 放弃进行中的委托 */
+export function abandonMission(userId, offerId) {
+  return request('/api/mission/abandon', { userId, offerId })
+}

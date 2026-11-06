@@ -17,7 +17,7 @@ import { matches } from '../utils/search'
 const props = defineProps({
   hero: { type: Object, required: true }
 })
-const emit = defineEmits(['logout', 'admin'])
+const emit = defineEmits(['logout', 'admin', 'tasks'])
 
 const sections = catalog
 
@@ -148,13 +148,14 @@ const userRankColor = computed(() => {
         >{{ s.label }}</a>
       </nav>
 
+      <button class="btn-tasks" @click="emit('tasks')">任务中心</button>
       <button class="btn-admin" @click="emit('admin')">后台管理</button>
 
       <div class="user-chip">
         <span class="avatar" :style="{ background: userRankColor }">{{ hero.heroClass }}</span>
         <div class="who">
           <strong>{{ hero.username }}</strong>
-          <small>{{ memberNo }}</small>
+          <small>{{ memberNo }} · <em class="lv-tag">Lv.{{ hero.level ?? 1 }}</em></small>
         </div>
         <button class="btn-logout" @click="emit('logout')">退出</button>
       </div>
@@ -330,10 +331,28 @@ const userRankColor = computed(() => {
   box-shadow: 3px 3px 0 rgba(20, 16, 14, .3);
 }
 
+/* 任务中心入口 */
+.btn-tasks {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 7px 16px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #fff;
+  background: var(--cape-red);
+  border: 3px solid var(--hero-dark);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all .12s;
+}
+.btn-tasks:hover { background: var(--hero-dark); transform: translateY(-2px); }
+
 /* 后台管理入口 */
 .btn-admin {
   flex-shrink: 0;
-  margin-left: auto;
+  margin-left: 0;
   padding: 7px 16px;
   font-family: inherit;
   font-size: 12px;
@@ -360,6 +379,7 @@ const userRankColor = computed(() => {
 .who { display: flex; flex-direction: column; line-height: 1.15; }
 .who strong { font-size: 13px; font-weight: 800; color: #14100e; }
 .who small { font-size: 10px; font-weight: 700; color: #8a7a63; letter-spacing: 1px; }
+.lv-tag { font-style: normal; font-weight: 900; color: var(--cape-red); }
 .btn-logout {
   margin-left: 4px;
   padding: 7px 14px;

@@ -13,8 +13,8 @@ spring:
 # MyBatis-Plus 配置
 mybatis-plus:
   configuration:
-    # 控制台打印 SQL，方便调试
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    # SQL 日志：调试时改成 org.apache.ibatis.logging.stdout.StdOutImpl，平时保持 noLogging
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
     # 下划线自动转驼峰：hero_class -> heroClass
     map-underscore-to-camel-case: true
   global-config:

@@ -53,12 +53,19 @@ public class UserServiceImpl implements UserService {
             return Result.error("密码错误，连琦玉老师都不会记错密码哦");
         }
 
-        // 登录成功，返回英雄信息
+        // 登录成功，返回英雄信息（含经验等级，首页和任务中心都要用）
+        int level = user.getLevel() == null ? 1 : user.getLevel();
+        int exp = user.getExp() == null ? 0 : user.getExp();
+
         Map<String, Object> data = new HashMap<>();
         data.put("id", user.getId());
         data.put("username", user.getUsername());
         data.put("email", user.getEmail());
         data.put("heroClass", user.getHeroClass());
+        data.put("level", level);
+        data.put("exp", exp);
+        data.put("nextExp", 100 + (level - 1) * 60);
+        data.put("title", titleOf(level));
         return Result.success("登录成功", data);
     }
 
@@ -108,6 +115,14 @@ public class UserServiceImpl implements UserService {
 
         log.info("新英雄注册成功: {}（{}级）", username, heroClass);
         return Result.success("注册成功，欢迎加入英雄协会！", null);
+    }
+
+    /** 经验称号：与 ExpServiceImpl 的等级区间保持一致 */
+    private String titleOf(int level) {
+        if (level >= 20) return "S级英雄";
+        if (level >= 10) return "A级英雄";
+        if (level >= 5) return "B级英雄";
+        return "C级英雄";
     }
 
     /** 字符串去空格，空串返回 null */

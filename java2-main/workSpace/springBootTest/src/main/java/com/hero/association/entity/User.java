@@ -30,6 +30,12 @@ public class User {
     /** 英雄等级：C / B / A / S */
     private String heroClass;
 
+    /** 当前级内经验（完成任务累加，满了升级） */
+    private Integer exp;
+
+    /** 英雄经验等级，从 1 开始 */
+    private Integer level;
+
     /** 注册时间（数据库默认 CURRENT_TIMESTAMP） */
     private LocalDateTime createTime;
 

@@ -244,3 +244,104 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:5173   # 前端
 - **插画仍然是零**：`src/assets/avatars/` 为空，AvatarBadge 全部走程序化剪影（首字 + 稳定哈希配色）。重新生成插画后填 `avatar` key 即可自动生效
 - 本次验证：`/api/catalog` 30/30/12/12、登录 code 200、后台 list/save(h-31 自增)/delete 闭环、9 个前端模块全 200、`vite build` 36 模块通过、数据自检（筛选项/热词/首页 5 热词）全绿
 - **本次启动方式**（AI 会话内）：后端 `mvn spring-boot:run -Dspring-boot.run.arguments=--server.port=8080`；前端 `node node_modules/vite/bin/vite.js --host`（用户双击 start.bat 仍是标准路径）
+
+## 2026-11-06 第五次回退 + 第五次重建（装依赖并运行）
+
+- 工作副本仍是 `D:\workSpace\java2\java2-main\workSpace`。检查发现又回到 10-28 之前的版本：
+  前端 `src/data/catalog.js`、`src/utils/search.js`、SearchPanel / ResultCard / AvatarBadge / AdminLogin / AdminPanel 全丢；
+  后端只剩 UserController（无四表实体/Mapper/CatalogService/CatalogController/AdminController/MybatisPlusConfig）；
+  `node_modules` 与 `target/classes` 也被清空；数据库回到 12/12/8/8。
+- **已全部重建并跑通**（本次分工方式，可复用）：
+  - 前端数据层：`catalog.js`（84 条：30/30/12/12，含 LEVEL_ORDER / itemSearchText / loadCatalog）、
+    `utils/search.js`（matches 去空白匹配）、`gen_catalog_data.mjs`（生成 `sql/catalog_data.sql` + 自检筛选项/热词）
+  - 前端组件：SearchPanel / ResultCard / AvatarBadge / AdminLogin / AdminPanel
+  - 后端：4 个实体 + 4 个 Mapper + MybatisPlusConfig + CatalogService(+Impl) + CatalogController + AdminController
+  - 数据库：`mysql -uroot -p123456 --default-character-set=utf8mb4 hero_association < springBootTest/sql/catalog_data.sql`
+    （生成脚本已带 4 条 DELETE，导入后 30/30/12/12）
+- **本次没踩到的坑**（别预设一定会发生）：`npm install` 一次成功，
+  `@rolldown/binding-win32-x64-msvc` 正常装上了（package.json 的 optionalDependencies 生效），
+  Maven `dependency:go-offline` + `compile` 也全用本地 ~/.m2 缓存，无需重下。所以先检查再按坑修，别盲目 npm pack
+- 启动：`mvn.cmd -B spring-boot:run -Dspring-boot.run.arguments=--server.port=8080`（SERVER__PORT 注入坑仍在）；
+  前端 `npm run dev -- --host 0.0.0.0`（让 IPv4 127.0.0.1 也能访问，方便 curl / 内置浏览器验证）
+- 模板里触发事件统一用 `$emit('xxx')` 或包装函数，不直接写 `emit('xxx')`，避免运行时上下文歧义
+- 验证结果：8080/5173 均 LISTENING；`/api/catalog` 30/30/12/12；登录直连与 Vite 代理均 code 200；
+  `/api/heroes?level=S&sort=power&page=1&size=3` total=9；后台 CRUD（新增 h-31 → 31 条 → 删除 → 30 条）闭环；
+  `npm run build` 36 模块通过；10 个前端模块全部 200 且无 Failed to resolve
+- 形象插画仍为空：`src/assets/avatars/` 目录已建（空），AvatarBadge 走首字+哈希配色的程序化剪影，
+  灾害/公告走符号图标；以后放进 PNG 并填 `avatar` key 即自动生效
+- **浏览器渲染验证的坑**（2026-11-06 续跑实测）：本机 Chrome 在
+  `C:\Program Files (x86)\Google\Chrome\Application\chrome.exe`，`--headless=new` 完全起不来；
+  `--headless=old` 能跑 `data:` URL，但访问 `http://127.0.0.1:5173` 时 `--dump-dom` 输出 0 字节、
+  截图也失败（沙箱拦本机回环），**别在这上面浪费时间**
+- **可靠替代：Vite SSR 渲染验证**（不用浏览器也能抓运行时错误）：在前端目录写临时 `.mjs`，
+  `createServer({ server:{middlewareMode:true}, appType:'custom' })` → `ssrLoadModule('/src/xxx.vue')` →
+  `createSSRApp(mod.default, props)` + `renderToString()`，逐个渲染 App / HomePage / SearchPanel /
+  ResultCard / AvatarBadge / AdminLogin / AdminPanel，全部通过即说明 setup 与模板无运行时错误。
+  本次 7/7 通过（App 1789 字节，登录页含「认真登录」）；**脚本跑完记得删**
+
+## 2026-11-06（2）经验系统：做任务 → 得经验 → 升级
+
+- 入口：首页导航栏「任务中心」按钮 → `TaskCenter.vue`；`App.vue` 视图状态机扩为
+  `login | register | loading | home | tasks | adminLogin | admin`
+- 数据库脚本 `springBootTest/sql/exp_system.sql`（**可重复执行**：ALTER 前查 information_schema，INSERT 用 IGNORE）：
+  - `t_user` 加 `exp`（当前级内经验）、`level`（1~99，默认 1）
+  - `t_task` 任务模板：id/title/type(日常/讨伐/灾害/特殊)/difficulty(D/C/B/A/S)/exp_reward/repeatable/detail/weight，种子 **14 条**
+  - `t_task_log` 完成记录：user_id/task_id/task_title/exp_gained/level_before/level_after/create_time
+- 核心规则（`ExpServiceImpl`）：
+  - 升级所需经验 `100 + (level-1)*60`，经验溢出连升多级，等级上限 99（满级后经验封顶）
+  - 一次性任务（repeatable=0）只能完成一次；日常任务（repeatable=1）按 `create_time` 的日期每天一次
+  - 称号：Lv1-4 C级 / 5-9 B级 / 10-19 A级 / 20+ S级 —— `titleOf()` 在 `ExpServiceImpl` 和
+    `UserServiceImpl` 各有一份（登录返回要用），**改区间必须两边同步**
+- 接口：`GET /api/tasks?userId=`（profile + tasks + 最近 10 条 logs）、
+  `POST /api/tasks/complete {userId,taskId}`、`GET /api/profile?userId=`
+  - `GET /api/{section}` 泛型路由不会抢 `/api/tasks`、`/api/profile`（Spring 精确路径优先），已实测
+  - 业务异常统一 `Result.error(原消息)`，前端直接展示（如"这个日常任务今天已经做过了，明天再来"）
+- 前端：`TaskCenter.vue`（等级徽章 + 经验条 + 分类 tab + 任务卡 + +EXP 飘字 + LEVEL UP 弹层 + 最近完成）、
+  `api/index.js` 加 `fetchTasks` / `completeTask`、HomePage 导航加「任务中心」并显示 `Lv.n`、
+  App.vue 用 `@profile` 把最新等级同步回 `user`（返回首页不丢）
+- 验证（2026-11-06 实测）：t-08（500 EXP）从 Lv.1 连升到 **Lv.4 余 20**；重复做一次性任务被拒；
+  日常任务当天重复被拒；Vite 代理 200；`npm run build` 38 模块；SSR 渲染 TaskCenter/HomePage/App 全通过。
+  测试数据已清理，`t_user` 全部回到 `exp=0 / level=1`
+
+## 2026-11-06（3）任务 2.0：任务更多 + 刷新 + 互动流程
+
+- **需求**：任务要更多、做完能刷新出新任务、做任务要有过程和互动（不是点一下就完成）
+- **数据库**：`springBootTest/sql/mission_v2.sql`（可重复执行）
+  - `t_task` 扩列：`scene / rounds / min_score / trait / time_limit / chain / story / desc_text / rarity`
+  - 新表 `t_task_step`：一回合一行，`prompt` + 三组 `choice_x / score_x / reply_x`
+  - 新表 `t_task_offer`：任务板上的「委托」实例（user_id / task_id / status / slot / refresh_no / start_time / expire_time）
+  - 新表 `t_task_pick`：回合作答记录（`UNIQUE KEY uk_pick (offer_id, seq)` 防重复提交刷分）
+  - `t_task_log` 加 `total_score / judge / offer_id`
+  - 任务从 14 条扩到 **51 条 / 192 回合**：日常 10、讨伐 11、灾害 7、特殊 17、突袭 6（限时）、链式 4
+- **核心设计（别改错）**：
+  1. 任务板挂的是 offer 不是 task；刷新 = 删掉 `status='open'` 的委托 + 按稀有度加权重抽 6 张（传奇 1 / 稀有 3 / 普通 6），`active` 的不动
+  2. 抽取池排除「已完成的一次性任务」和「前置链式任务未完成」的任务 → 链式任务天然解锁
+  3. 回合选项分数**不下发前端**（`toStepMap(s, true)`），作答只回 `reply`；结算按 `t_task_pick` 汇总算分
+  4. 评分 = Σ得分 / Σ每回合最高分 × 100；通关线 60；评价 90+S / 80+A / 60+B / 40+C / 其余 D
+  5. 经验折算 S 100% / A 90% / B 75% / C 50% / D 25%，最低 5 点
+  6. 服务端按 `score` 归一化后与写死的 `min_score=60` 比较（`t_task.min_score` 只是展示用，实际判定走常量 `ExpSupport.PASS_SCORE`）
+- **共用规则收敛**：新增 `service/impl/ExpSupport.java`（抽象类）放 `needExp / titleOf / judgeOf / expRateOf / applyExp / grant / buildProfile / logsOf / doneTaskIds / stepsOf / requireOffer / toStepMap`，
+  `ExpServiceImpl` 与 `MissionServiceImpl` 都继承它 —— **称号区间以后只需要改 ExpSupport 一处**（旧备忘里「两处 titleOf 要同步」的问题已解决）
+- **接口（MissionController，全部 try/catch → Result.error(业务消息)）**：
+  `GET /api/mission/board?userId=`、`POST /api/mission/refresh`、`/start`、`/answer`、`/settle`、`/abandon`
+  老接口 `GET /api/tasks`、`POST /api/tasks/complete`、`GET /api/profile` 保留兼容（complete 固定记 70 分/B 评价）
+- **前端**：
+  - `TaskCenter.vue` 重写为委托板（经验卡 + 进行中条 + 6 个分类 tab + 卡片 + 「刷新委托」按钮 + 已完成侧栏）
+  - 新组件 `MissionPlay.vue`（全屏 3 阶段）：简报（场景色 + 剧情 + 回合数/通关线/限时）→ 逐回合（进度条、A/B/C 三选、选后出「结果」反馈再继续、左侧历史）→ 结算（巨大评价字母 + 分数换算 + 经验 + 升级 + 经验条动画）
+  - 场景配色表 `SCENE`（11 种：city/forest/coast/factory/sky/ruin/arena/base/hospital/sewer/night），整个互动页底色随场景变化
+  - `api/index.js` 追加 `fetchMissionBoard / refreshMissions / startMission / answerMission / settleMission / abandonMission`
+- **本次踩的坑**：
+  1. `LambdaQueryWrapper` 的 map 方法引用不能直接用在 `Map<String,Object>` 流上（编译报「找不到符号 getRefreshNo」）→ 改用 `((Number) o.getOrDefault(...)).intValue()`
+  2. `t_task_log.create_time` 在 MySQL 里是 `NOT NULL DEFAULT CURRENT_TIMESTAMP`，而 MyBatis-Plus 插入时会带上 `create_time=null` → 必须 `@TableField(insertStrategy = FieldStrategy.NEVER)`
+  3. `application.yml` 的 SQL 控制台日志（`StdOutImpl`）会让 `mvn spring-boot:run` 日志爆到 150KB+，已改成 `NoLoggingImpl`（要调试再换回来）
+  4. 之前的「18 个文件重建」是回退造成的，注意别再把 `design_tasks.py` / `verify_mission.py` 这类临时脚本留在仓库（本次已删）
+- **验证（2026-11-06 实测）**：
+  - 全选 A：`76/76 = 100 分（S）`，经验满额，Lv.1→Lv.2
+  - 全选 C（最差）：`29 分` → 拒绝结算「评分 29 没有达到通关线 60」
+  - 重复结算 → 「这张委托已经结算过了」；同回合重复提交 → 「第 N 回合已经行动过了」；没打完结算 → 「还有 N 个回合没有行动」
+  - 刷新两次：6 张委托整批换新（池子没抽完时）；连刷 30 次共出现 47 种任务
+  - 链式：t-05 未完成时 60 次刷新都摇不到 t-36，完成 t-05 后立刻能摇到
+  - 限时：接取后返回 `remainSeconds=420`，前端倒计时到 0 提示超时
+  - 老接口 `/api/tasks` 47 条、`/api/profile` 正常；Vite 代理 `/api/mission/board` 与直连 8080 返回结构一致
+  - `npm run build` 40 模块通过；SSR 渲染 App / TaskCenter / MissionPlay 3/3 通过
+  - 测试数据已清空（`t_task_offer` / `t_task_pick` / `t_task_log` 为 0，`t_user` 全部 Lv.1 exp 0）

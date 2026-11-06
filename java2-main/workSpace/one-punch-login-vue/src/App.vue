@@ -7,11 +7,12 @@ import HomePage from './components/HomePage.vue'
 import LoadingOverlay from './components/LoadingOverlay.vue'
 import AdminLogin from './components/AdminLogin.vue'
 import AdminPanel from './components/AdminPanel.vue'
+import TaskCenter from './components/TaskCenter.vue'
 import { login, register } from './api'
 import { loadCatalog } from './data/catalog'
 
 // 全局状态：协调琦玉动画与登录/注册/加载/主页
-const view = ref('login')    // 当前视图：login | register | loading | home | adminLogin | admin
+const view = ref('login')    // 当前视图：login | register | loading | home | tasks | adminLogin | admin
 const serious = ref(false)   // 认真脸
 const punching = ref(false)  // 出拳动画
 const hitting = ref(false)   // 按钮闪光
@@ -158,6 +159,19 @@ function onAdminLogout() {
   view.value = 'login'
 }
 
+// ===== 经验系统 =====
+// 任务中心里拿到经验/升级后，同步首页右上角的等级与称号
+function onProfileUpdate(p) {
+  if (!user.value || !p) return
+  user.value = {
+    ...user.value,
+    level: p.level,
+    exp: p.exp,
+    nextExp: p.nextExp,
+    title: p.title
+  }
+}
+
 // ===== 首页 =====
 function onLogout() {
   user.value = null
@@ -204,6 +218,15 @@ function showTip(text, type) {
     :hero="user"
     @logout="onLogout"
     @admin="switchView('adminLogin')"
+    @tasks="switchView('tasks')"
+  />
+
+  <!-- 任务中心：做任务 → 得经验 → 升级 -->
+  <TaskCenter
+    v-else-if="view === 'tasks'"
+    :hero="user"
+    @back="switchView('home')"
+    @profile="onProfileUpdate"
   />
 
   <div v-else class="stage">
